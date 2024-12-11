@@ -1,0 +1,47 @@
+plugins {
+    id("org.jetbrains.kotlin.jvm") version "1.7.20"
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.7.20"
+
+    id("net.mamoe.mirai-console") version "2.16.0"
+
+    id("com.github.gmazzo.buildconfig") version "3.1.0"
+}
+
+group = "cn.chahuyun"
+version = "1.0-SNAPSHOT"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+    //依赖
+    compileOnly("cn.chahuyun:HuYanAuthorize:1.7.5")
+    compileOnly("cn.chahuyun:HuYanAuthorize:1.2.0")
+
+    //使用库
+    implementation("org.projectlombok:lombok:1.18.24")
+    annotationProcessor("org.projectlombok:lombok:1.18.24")
+
+    implementation("cn.hutool:hutool-all:5.8.30")
+
+    implementation("cn.chahuyun:hibernate-plus:1.0.16")
+
+}
+
+mirai {
+    jvmTarget = JavaVersion.VERSION_11
+}
+
+buildConfig {
+    className("BuildConstants")
+    packageName("cn.chahuyun.doudizhu")
+    useKotlinOutput()
+    buildConfigField("String", "VERSION", "\"${project.version}\"")
+    buildConfigField(
+        "java.time.Instant",
+        "BUILD_TIME",
+        "java.time.Instant.ofEpochSecond(${System.currentTimeMillis() / 1000L}L)"
+    )
+}
