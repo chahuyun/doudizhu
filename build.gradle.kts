@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "cn.chahuyun"
-version = "1.0-SNAPSHOT"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
@@ -17,7 +17,7 @@ repositories {
 dependencies {
 
     //依赖
-    compileOnly("cn.chahuyun:HuYanAuthorize:1.7.5")
+    compileOnly("cn.chahuyun:HuYanEconomy:1.7.6")
     compileOnly("cn.chahuyun:HuYanAuthorize:1.2.0")
 
     //使用库
