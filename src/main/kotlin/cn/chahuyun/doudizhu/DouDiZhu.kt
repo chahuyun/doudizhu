@@ -12,7 +12,12 @@ object DouDiZhu : KotlinPlugin(
     }
 ) {
 
+    override fun onDisable() {
 
 
+    }
 
+    override fun onEnable() {
+        super.onEnable()
+    }
 }
