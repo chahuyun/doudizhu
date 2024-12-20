@@ -23,7 +23,7 @@ data class Game(
     /**
      * 剩余牌数
      */
-    var residual: Int = 52,
+    var residual: Int = 54,
     /**
      * 下一位出牌玩家
      */
@@ -32,7 +32,15 @@ data class Game(
      * 地主
      */
     var landlord: Player,
-)
+) {
+    /**
+     * 给这个玩家加一张牌
+     */
+    fun addHand(playerIndex: Int, car: Car) {
+        players[playerIndex].addHand(car)
+    }
+
+}
 
 /**
  * 玩家
@@ -41,22 +49,60 @@ data class Player(
     val id: Long,
     val name: String,
     val hand: MutableList<Cards>,
-)
+) {
+    fun addHand(car: Car) {
+        hand.find { it.car == car }?.let { it.num++ } ?: run { hand.add(Cards(car)) }
+    }
+}
 
 /**
  * 手牌
  */
 data class Cards(
     val car: Car,
-    var num: Int,
-)
+    var num: Int = 1,
+) {
+    companion object {
+        /**
+         * 创建一副牌
+         */
+        @JvmStatic
+        fun createFullDeck(): List<Cards> {
+            return listOf(
+                Cards(Car.A, 4),
+                Cards(Car.TWO, 4),
+                Cards(Car.THREE, 4),
+                Cards(Car.FOUR, 4),
+                Cards(Car.FIVE, 4),
+                Cards(Car.SIX, 4),
+                Cards(Car.SEVEN, 4),
+                Cards(Car.EIGHT, 4),
+                Cards(Car.NINE, 4),
+                Cards(Car.TEN, 4),
+                Cards(Car.J, 4),
+                Cards(Car.Q, 4),
+                Cards(Car.K, 4),
+                Cards(Car.SMALL_JOKER, 1),
+                Cards(Car.BIG_JOKER, 1)
+            )
+        }
+
+        /**
+         * 创建一副随机打乱展开的牌
+         */
+        @JvmStatic
+        fun createFullExpandDeck(): List<Car> {
+            return createFullDeck().flatMap { cars -> List(cars.num) { cars.car } }.shuffled()
+        }
+    }
+}
 
 /**
  * 牌
  */
 enum class Car(
     val value: Int,
-    val marking: String
+    val marking: String,
 ) {
     A(1, "A"),
     TWO(2, "2"),
@@ -71,6 +117,7 @@ enum class Car(
     J(11, "J"),
     Q(12, "Q"),
     K(13, "K"),
+
     // 添加大小王，通常它们没有数值，或者可以根据游戏规则给予特定值
     SMALL_JOKER(-1, "小王"),  // 小王
     BIG_JOKER(-2, "大王");      // 大王
