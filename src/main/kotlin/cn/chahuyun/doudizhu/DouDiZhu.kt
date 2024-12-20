@@ -13,7 +13,7 @@ object DouDiZhu : KotlinPlugin(
 ) {
 
     override fun onDisable() {
-
+        DZConfig.reload()
 
     }
 
