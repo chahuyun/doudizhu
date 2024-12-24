@@ -96,7 +96,21 @@ class GameTable(
             nextPlayerIndex = (nextPlayerIndex + 1) % game.players.size
         }
 
+        game.players.forEach {
+            group[it.id]?.modifyAdmin(true) ?: run {
+                sendMessage("有一位牌友不在群里，游戏失败")
+                game.players.forEach { at -> group[at.id]?.modifyAdmin(false) }
+                return
+            }
+        }
 
+        group.settings.isMuteAll = true
+
+        game.players.forEach {
+            bot.getFriend(it.id)?.sendMessage("你的手牌:\n ${it.toHand()}")
+        }
+
+        sendMessage("游戏开始，请移至好友查看手牌!")
     }
 
 

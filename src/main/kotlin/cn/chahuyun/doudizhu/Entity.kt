@@ -53,6 +53,24 @@ data class Player(
     fun addHand(car: Car) {
         hand.find { it.car == car }?.let { it.num++ } ?: run { hand.add(Cards(car)) }
     }
+
+
+    fun toHand(): String {
+        // 定义排序规则
+        val order = listOf(
+            Car.THREE, Car.FOUR, Car.FIVE, Car.SIX, Car.SEVEN,
+            Car.EIGHT, Car.NINE, Car.TEN, Car.J, Car.Q, Car.K,
+            Car.A, Car.TWO, Car.SMALL_JOKER, Car.BIG_JOKER
+        )
+
+        // 对手牌进行排序
+        val sortedHand = hand.sortedWith(compareBy { order.indexOf(it.car) })
+
+        // 将手牌转换成字符串表示形式
+        return sortedHand.flatMap { card ->
+            List(card.num) { "[" + card.car.marking + "]" }
+        }.joinToString("")
+    }
 }
 
 /**
