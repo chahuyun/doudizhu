@@ -4,6 +4,30 @@ import net.mamoe.mirai.Bot
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.MemberPermission
 
+/**
+ * 一个游戏桌上的对局状态
+ */
+enum class GameStatus {
+    /**
+     * 刚开始
+     */
+    START,
+
+    /**
+     * 抢地主
+     */
+    DIZHU,
+
+    /**
+     * 战斗中
+     */
+    BATTLE,
+
+    /**
+     * 结束
+     */
+    STOP
+}
 
 interface GameTableProcess {
 
@@ -38,27 +62,33 @@ interface GameTableProcess {
  */
 class GameTable(
     /**
-     * 对局信息
+     * 玩家
      */
-    private val game: Game,
-    /**
-     * 群
-     */
-    private val group: Group,
+    val players: List<Player>,
     /**
      * bot
      */
     private val bot: Bot,
     /**
+     * 群
+     */
+    private val group: Group,
+    /**
      * 游戏状态
      */
-    private val status: Boolean,
+    private var status: GameStatus = GameStatus.START,
+
     /**
      * 牌库
      */
-    private var deck: List<Car> = Cards.createFullExpandDeck(),
+    private val deck: List<Car> = Cards.createFullExpandDeck(),
 
     ) : GameTableProcess {
+
+    /**
+     * 对局信息
+     */
+    private lateinit var game: Game
 
     /**
      * 底牌，先用空代替
@@ -76,13 +106,14 @@ class GameTable(
             return
         }
 
-        game.players.forEach {
+        players.forEach {
             if (bot.getFriend(it.id) == null) {
                 sendMessage("${it.name} 还不是本${DZConfig.botName}的好友哦!")
                 return
             }
         }
 
+        game = Game(players, group.id, 3, 0, players[0])
 
         // 分配底牌
         bottomCards = deck.take(3)
@@ -99,7 +130,10 @@ class GameTable(
         game.players.forEach {
             group[it.id]?.modifyAdmin(true) ?: run {
                 sendMessage("有一位牌友不在群里，游戏失败")
-                game.players.forEach { at -> group[at.id]?.modifyAdmin(false) }
+                try {
+                    game.players.forEach { at -> group[at.id]?.modifyAdmin(false) }
+                } catch (_: Exception) {
+                }
                 return
             }
         }
@@ -119,6 +153,9 @@ class GameTable(
      * ->决定地主，补牌
      */
     override suspend fun dizhu() {
+        status = GameStatus.DIZHU
+
+
         TODO("Not yet implemented")
     }
 
