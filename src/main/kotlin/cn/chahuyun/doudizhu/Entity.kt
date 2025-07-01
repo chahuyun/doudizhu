@@ -21,18 +21,19 @@ data class Game(
      */
     var fold: Int,
     /**
-     * 剩余牌数
-     */
-    var residual: Int = 54,
-    /**
      * 下一位出牌玩家
      */
     var nextPlayer: Player,
     /**
+     * 剩余牌数
+     */
+    var residual: Int = 54,
+) {
+    /**
      * 地主
      */
-    var landlord: Player,
-) {
+    lateinit var landlord: Player
+
     /**
      * 给这个玩家加一张牌
      */
@@ -48,7 +49,10 @@ data class Game(
 data class Player(
     val id: Long,
     val name: String,
-    val hand: MutableList<Cards>,
+    /**
+     * 手牌
+     */
+    val hand: MutableList<Cards> = mutableListOf(),
 ) {
     fun addHand(car: Car) {
         hand.find { it.car == car }?.let { it.num++ } ?: run { hand.add(Cards(car)) }
