@@ -17,15 +17,25 @@ import net.mamoe.mirai.message.data.content
 @EventComponent
 class GameEvent {
 
+    /**
+     * 游戏桌
+     */
+    private val gameTables: MutableMap<Long,GameTable> = mutableMapOf()
+
     @MessageAuthorize(text = ["开桌"])
     suspend fun startGame(event: GroupMessageEvent) {
         val sender = event.sender
         val group = event.group
 
-        group.sendMessage("${sender.nick} 开启了一桌游戏，快快发送加入对局进行游戏吧!")
+        if (gameTables.containsKey(group.id)) {
+            group.sendMessage("游戏桌已存在，请勿重复创建")
+            return
+        }
+
+        group.sendMessage("${sender.nick} 开启了一桌游戏，快快发送 加入对局 加入对局进行游戏吧!")
 
         val players = mutableListOf<Player>() // 使用可变列表来添加玩家
-        players.add(Player(sender.id, sender.nameCard, mutableListOf())) // 添加发起者为第一个玩家
+        players.add(Player(sender.id, sender.nameCard)) // 添加发起者为第一个玩家
 
         while (players.size < 3) {
             val messageEvent = withTimeoutOrNull(60_000) { // 等待60秒
@@ -35,8 +45,8 @@ class GameEvent {
                 return // 如果超时则退出
             }
 
-            if (messageEvent.message.content.startsWith("加入")) { // 检查消息内容是否为加入请求
-                val newPlayer = Player(messageEvent.sender.id, messageEvent.sender.nick, mutableListOf())
+            if (messageEvent.message.contentToString().startsWith("加入对局")) { // 检查消息内容是否为加入请求
+                val newPlayer = Player(messageEvent.sender.id, messageEvent.sender.nick)
                 if (!players.any { it.id == newPlayer.id }) { // 防止重复加入
                     players.add(newPlayer)
                     group.sendMessage("${newPlayer.name} 加入了游戏！当前人数：${players.size}")
@@ -44,7 +54,9 @@ class GameEvent {
             }
         }
 
-        // 游戏准备就绪，可以开始分发牌等后续逻辑...
+        val gameTable = GameTable(players, event.bot, group)
+        gameTables[group.id] = gameTable
+        gameTable.start()
     }
 
 
