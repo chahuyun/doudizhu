@@ -1,6 +1,7 @@
 plugins {
-    id("org.jetbrains.kotlin.jvm") version "1.7.20"
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.7.20"
+    val kotlinVersion = "1.9.23"
+    id("org.jetbrains.kotlin.jvm") version kotlinVersion
+    id("org.jetbrains.kotlin.plugin.serialization") version kotlinVersion
 
     id("net.mamoe.mirai-console") version "2.16.0"
 

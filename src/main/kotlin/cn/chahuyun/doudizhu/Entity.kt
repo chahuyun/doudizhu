@@ -81,7 +81,13 @@ data class Player(
  * 手牌
  */
 data class Cards(
+    /**
+     * 牌
+     */
     val car: Car,
+    /**
+     * 数量
+     */
     var num: Int = 1,
 ) {
     companion object {
@@ -126,7 +132,6 @@ enum class Car(
     val value: Int,
     val marking: String,
 ) {
-    A(1, "A"),
     TWO(2, "2"),
     THREE(3, "3"),
     FOUR(4, "4"),
@@ -139,6 +144,7 @@ enum class Car(
     J(11, "J"),
     Q(12, "Q"),
     K(13, "K"),
+    A(14, "A"),
 
     // 添加大小王，通常它们没有数值，或者可以根据游戏规则给予特定值
     SMALL_JOKER(-1, "小王"),  // 小王
@@ -148,6 +154,33 @@ enum class Car(
         // 如果需要根据字符串查找对应的枚举成员，可以提供一个辅助方法
         fun fromMarking(marking: String): Car? {
             return values().find { it.marking.equals(marking, ignoreCase = true) }
+        }
+
+        /**
+         * 判断是否连续（允许乱序）
+         */
+        fun continuous(cars: List<Car>): Boolean {
+            if (cars.size <= 1) return false
+
+            //链子中不能有大小王和2
+            if (cars.contains(SMALL_JOKER) || cars.contains(BIG_JOKER) || cars.contains(TWO)){
+                return false
+            }
+
+            // 先根据 value 排序
+            val sorted = cars.sortedBy { it.value }
+
+            // 再检查是否连续
+            return sorted.zipWithNext().all { (car1, car2) ->
+                car2.value == car1.value + 1
+            }
+        }
+
+        /**
+         * 判断是否连续（允许乱序）
+         */
+        fun continuous(cars: List<Cards>): Boolean {
+            return continuous(cars.map { it.car })
         }
     }
 }
