@@ -1,8 +1,12 @@
 package cn.chahuyun.doudizhu
 
+import cn.chahuyun.doudizhu.MessageUtil.nextMessage
+import kotlinx.coroutines.withTimeoutOrNull
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.MemberPermission
+import net.mamoe.mirai.message.data.At
+import net.mamoe.mirai.message.data.PlainText
 
 /**
  * 一个游戏桌上的对局状态
@@ -85,6 +89,17 @@ class GameTable(
 
     ) : GameTableProcess {
 
+    companion object {
+        //回复超时时间
+        private const val CONFIG_TIMEOUT_SECONDS = 30L
+
+        //最低底分
+        private const val MIN_BET = 1
+
+        //最高底分
+        private const val MAX_BET = 1000
+    }
+
     /**
      * 对局信息
      */
@@ -103,17 +118,55 @@ class GameTable(
     override suspend fun start() {
         if (group.botPermission != MemberPermission.OWNER) {
             sendMessage("本${DZConfig.botName}不是群主哦~")
+            cancelGame()
             return
         }
 
-        players.forEach {
-            if (bot.getFriend(it.id) == null) {
-                sendMessage("${it.name} 还不是本${DZConfig.botName}的好友哦!")
-                return
+        sendMessage("游戏开始,请在1分钟内添加本bot的好友!")
+
+        withTimeoutOrNull(60 * 1000L) {
+            val util = PlayerUtil(players)
+            if (util.check()) return@withTimeoutOrNull
+            if (util.listening()) return@withTimeoutOrNull
+        } ?: run {
+            players.forEach {
+                if (bot.getFriend(it.id) == null) {
+                    sendMessage("${it.name} 还不是本${DZConfig.botName}的好友哦!")
+                    cancelGame()
+                    return
+                }
             }
         }
 
-        game = Game(players, group.id, 3, 0, players[0])
+        val player = players[0]
+        sendMessage(player.id, "请配置底分($MIN_BET~$MAX_BET),发送掀桌停止!")
+
+        var bottom = 0
+        while (bottom == 0) {
+            val nextMessage = nextMessage(player, CONFIG_TIMEOUT_SECONDS.toInt()) ?: run {
+                sendMessage("配置超时,(╯‵□′)╯︵┻━┻")
+                cancelGame()
+                return
+            }
+
+            val input = nextMessage.message.contentToString().trim()
+
+            if (input == "掀桌") {
+                sendMessage("${player.name} 停止了对局!")
+                cancelGame()
+                return
+            }
+
+            val bet = input.toIntOrNull()
+            if (bet != null && bet in MIN_BET..MAX_BET) {
+                sendMessage("${player.name} 配置底分为: $bet!")
+                bottom = bet
+            } else {
+                sendMessage("请输入有效的底分（$MIN_BET~$MAX_BET）")
+            }
+        }
+
+        game = Game(players, group.id, bottom, 0)
 
         // 分配底牌
         bottomCards = deck.take(3)
@@ -154,6 +207,15 @@ class GameTable(
      */
     override suspend fun dizhu() {
         status = GameStatus.DIZHU
+        val nextPlayer = game.nextPlayer
+
+        var landlord: Player
+        while (true) {
+            sendMessage(nextPlayer.id, "开始抢地主:(抢/抢地主)")
+            val nextMessage = nextMessage(nextPlayer)
+
+
+        }
 
 
         TODO("Not yet implemented")
@@ -176,6 +238,18 @@ class GameTable(
 
     private suspend fun GameTable.sendMessage(msg: String) {
         this.group.sendMessage(msg)
+    }
+
+    private suspend fun GameTable.sendMessage(id: Long, msg: String) {
+        this.group.sendMessage(At(id).plus(PlainText(msg)))
+    }
+
+    private suspend fun GameTable.sendMessage(player: Player, msg: String) {
+        this.group.sendMessage(At(player.id).plus(PlainText(msg)))
+    }
+
+    private suspend fun GameTable.cancelGame() {
+        GameEvent.cancelGame(group)
     }
 }
 
