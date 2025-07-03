@@ -2,11 +2,9 @@ package cn.chahuyun.doudizhu
 
 import cn.chahuyun.authorize.EventComponent
 import cn.chahuyun.authorize.MessageAuthorize
-import kotlinx.coroutines.time.withTimeoutOrNull
-import kotlinx.coroutines.withTimeoutOrNull
-import net.mamoe.mirai.event.GlobalEventChannel
+import cn.chahuyun.doudizhu.MessageUtil.nextGroupMessage
+import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.event.events.GroupMessageEvent
-import net.mamoe.mirai.message.data.content
 
 /**
  * 游戏事件
@@ -17,35 +15,41 @@ import net.mamoe.mirai.message.data.content
 @EventComponent
 class GameEvent {
 
-    /**
-     * 游戏桌
-     */
-    private val gameTables: MutableMap<Long,GameTable> = mutableMapOf()
+    companion object{
+        /**
+         * 游戏桌
+         */
+        private val gameTables: MutableMap<Long, GameTable> = mutableMapOf()
 
-    @MessageAuthorize(text = ["开桌"])
+        fun cancelGame(group: Group) {
+            gameTables.remove(group.id)
+        }
+    }
+
+
+
+    @MessageAuthorize(text = ["开桌","┳━┳","来一局"])
     suspend fun startGame(event: GroupMessageEvent) {
         val sender = event.sender
         val group = event.group
 
         if (gameTables.containsKey(group.id)) {
-            group.sendMessage("游戏桌已存在，请勿重复创建")
+            group.sendMessage("游戏桌 ┳━┳ 已存在，请勿重复创建")
             return
         }
 
-        group.sendMessage("${sender.nick} 开启了一桌游戏，快快发送 加入对局 加入对局进行游戏吧!")
+        group.sendMessage("${sender.nick} 开启了一桌游戏，快快发送 加入对局|┳━┳ 加入对局进行游戏吧!")
 
         val players = mutableListOf<Player>() // 使用可变列表来添加玩家
         players.add(Player(sender.id, sender.nameCard)) // 添加发起者为第一个玩家
 
         while (players.size < 3) {
-            val messageEvent = withTimeoutOrNull(60_000) { // 等待60秒
-                MessageUtil.nextMessage(sender)
-            } ?: run {
+            val messageEvent = nextGroupMessage(group) ?: run {
                 group.sendMessage("等待玩家加入超时，游戏未能开始。")
                 return // 如果超时则退出
             }
 
-            if (messageEvent.message.contentToString().startsWith("加入对局")) { // 检查消息内容是否为加入请求
+            if (messageEvent.message.contentToString().matches("^加入|对局|来|┳━┳".toRegex())) { // 检查消息内容是否为加入请求
                 val newPlayer = Player(messageEvent.sender.id, messageEvent.sender.nick)
                 if (!players.any { it.id == newPlayer.id }) { // 防止重复加入
                     players.add(newPlayer)
@@ -58,6 +62,5 @@ class GameEvent {
         gameTables[group.id] = gameTable
         gameTable.start()
     }
-
 
 }

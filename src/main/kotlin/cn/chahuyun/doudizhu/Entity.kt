@@ -21,18 +21,47 @@ data class Game(
      */
     var fold: Int,
     /**
-     * 下一位出牌玩家
-     */
-    var nextPlayer: Player,
-    /**
      * 剩余牌数
      */
     var residual: Int = 54,
+    /**
+     * 当前轮到哪个玩家出牌（索引）
+     */
+    var currentPlayerIndex: Int = 0
 ) {
+
     /**
      * 地主
      */
     lateinit var landlord: Player
+
+    /**
+     * 下一位出牌玩家
+     */
+    val nextPlayer: Player
+        get() {
+            for (i in 1..players.size) {
+                val index = (currentPlayerIndex + i) % players.size
+                val player = players[index]
+                if (player.hand.isNotEmpty()) {
+                    return player
+                }
+            }
+            return players.find { it.hand.isNotEmpty() } ?: players[0]
+        }
+
+    /**
+     * 手动设置下一个出牌人
+     */
+    fun setNextPlayer(player: Player) {
+        val index = players.indexOf(player)
+        if (index >= 0) {
+            currentPlayerIndex = index
+        } else {
+            error("Player not found in the game.")
+        }
+    }
+
 
     /**
      * 给这个玩家加一张牌
@@ -53,6 +82,11 @@ data class Player(
      * 手牌
      */
     val hand: MutableList<Cards> = mutableListOf(),
+
+    /**
+     * 是否允许出牌（可用于托管、超时等情况）
+     */
+    var canPlay: Boolean = true
 ) {
     fun addHand(car: Car) {
         hand.find { it.car == car }?.let { it.num++ } ?: run { hand.add(Cards(car)) }
