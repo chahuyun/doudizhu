@@ -1,5 +1,7 @@
-package cn.chahuyun.doudizhu
+package cn.chahuyun.doudizhu.util
 
+import cn.chahuyun.doudizhu.DouDiZhu
+import cn.chahuyun.doudizhu.Player
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.firstOrNull
 import net.mamoe.mirai.event.ListeningStatus
@@ -56,5 +58,5 @@ class PlayerUtil(private val players:List<Player>) {
     /**
      * 获取好友的下一条消息
      */
-    suspend fun Player.nextMessage():MessageEvent? = MessageUtil.nextMessage(this,30)
+    suspend fun Player.nextMessage():MessageEvent? = MessageUtil.nextMessage(this, 30)
 }

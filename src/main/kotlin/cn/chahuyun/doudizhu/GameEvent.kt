@@ -2,7 +2,8 @@ package cn.chahuyun.doudizhu
 
 import cn.chahuyun.authorize.EventComponent
 import cn.chahuyun.authorize.MessageAuthorize
-import cn.chahuyun.doudizhu.MessageUtil.nextGroupMessage
+import cn.chahuyun.doudizhu.util.MessageUtil.nextGroupMessage
+import cn.chahuyun.doudizhu.game.GameTable
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.event.events.GroupMessageEvent
 

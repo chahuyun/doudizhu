@@ -1,6 +1,8 @@
-package cn.chahuyun.doudizhu
+package cn.chahuyun.doudizhu.game
 
+import cn.chahuyun.doudizhu.Car
 import cn.chahuyun.doudizhu.Car.Companion.continuous
+import cn.chahuyun.doudizhu.Cards
 
 /**
  * 牌型
@@ -154,7 +156,7 @@ object CardFormUtil {
             }
             10-> when (typeNum) {
                 4-> if(continuous(sort.subList(0,2)) && sort.inspection(3,3,2,2)) CardForm.AIRCRAFT_PAIR else CardForm.ERROR
-                5-> if (continuous(sort) && sort.inspection(2,2,2,2,2)) CardForm.QUEUE_TWO  else CardForm.ERROR
+                5-> if (continuous(sort) && sort.inspection(2,2,2,2,2)) CardForm.QUEUE_TWO else CardForm.ERROR
                 10 -> if (continuous(sort)) CardForm.QUEUE else CardForm.ERROR
                 else -> CardForm.ERROR
             }
@@ -179,11 +181,11 @@ object CardFormUtil {
             }
             15->when(typeNum){
                 6-> if(continuous(sort.subList(0,4)) && sort.inspection(3,3,3,2,2,2)) CardForm.AIRCRAFT_SINGLE else CardForm.ERROR
-                else->CardForm.ERROR
+                else-> CardForm.ERROR
             }
             16->when(typeNum){
                 4->if(continuous(sort) && sort.inspection(4,4,4,4)) CardForm.AIRCRAFT_SINGLE else CardForm.ERROR
-                5->if (continuous(sort.subList(0,5)) &&(sort.inspection(4,3,3,3,3) || sort.inspection(4,4,4,3,1)))CardForm.AIRCRAFT_SINGLE else CardForm.ERROR
+                5->if (continuous(sort.subList(0,5)) &&(sort.inspection(4,3,3,3,3) || sort.inspection(4,4,4,3,1))) CardForm.AIRCRAFT_SINGLE else CardForm.ERROR
                 6-> when {
                     continuous(sort.subList(0,5)) &&(
                             sort.inspection(3,3,3,3,3,1) || sort.inspection(3,3,3,3,2,2) ||
@@ -193,7 +195,7 @@ object CardFormUtil {
                 }
                 7->if (continuous(sort.subList(0,5)) && sort.inspection(3,3,3,3,2,1,1)) CardForm.AIRCRAFT_SINGLE else CardForm.ERROR
                 8->if (continuous(sort.subList(0,5)) && sort.inspection(3,3,3,3,1,1,1,1)) CardForm.AIRCRAFT_SINGLE else CardForm.ERROR
-                else->CardForm.ERROR
+                else-> CardForm.ERROR
             }
             20->when(typeNum){
                 5->if(continuous(sort) && sort.inspection(4,4,4,4)) CardForm.AIRCRAFT_SINGLE else CardForm.ERROR

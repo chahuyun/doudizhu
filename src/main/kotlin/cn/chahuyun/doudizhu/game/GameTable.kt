@@ -1,6 +1,8 @@
-package cn.chahuyun.doudizhu
+package cn.chahuyun.doudizhu.game
 
-import cn.chahuyun.doudizhu.MessageUtil.nextMessage
+import cn.chahuyun.doudizhu.*
+import cn.chahuyun.doudizhu.util.MessageUtil.nextMessage
+import cn.chahuyun.doudizhu.util.PlayerUtil
 import kotlinx.coroutines.withTimeoutOrNull
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.contact.Group
@@ -162,7 +164,7 @@ class GameTable(
                 sendMessage("${player.name} 配置底分为: $bet!")
                 bottom = bet
             } else {
-                sendMessage("请输入有效的底分（$MIN_BET~$MAX_BET）")
+                sendMessage("请输入有效的底分（$MIN_BET~${MAX_BET}）")
             }
         }
 

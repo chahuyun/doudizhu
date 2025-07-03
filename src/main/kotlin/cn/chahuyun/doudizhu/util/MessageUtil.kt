@@ -1,10 +1,10 @@
-package cn.chahuyun.doudizhu
+package cn.chahuyun.doudizhu.util
 
+import cn.chahuyun.doudizhu.DouDiZhu
+import cn.chahuyun.doudizhu.Player
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withTimeoutOrNull
-import net.mamoe.mirai.contact.Contact
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.event.events.GroupMessageEvent
 import net.mamoe.mirai.event.events.MessageEvent
