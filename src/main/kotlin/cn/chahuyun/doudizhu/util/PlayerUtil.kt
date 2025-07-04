@@ -55,8 +55,6 @@ class PlayerUtil(private val players:List<Player>) {
         }.firstOrNull() ?: false
     }
 
-    /**
-     * 获取好友的下一条消息
-     */
-    suspend fun Player.nextMessage():MessageEvent? = MessageUtil.nextMessage(this, 30)
 }
+
+
