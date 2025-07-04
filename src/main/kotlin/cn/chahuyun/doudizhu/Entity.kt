@@ -1,5 +1,8 @@
 package cn.chahuyun.doudizhu
 
+import cn.chahuyun.doudizhu.Car.Companion.sort
+import cn.chahuyun.doudizhu.Cards.Companion.show
+
 /**
  * 对局
  */
@@ -27,7 +30,7 @@ data class Game(
     /**
      * 当前轮到哪个玩家出牌（索引）
      */
-    var currentPlayerIndex: Int = 0
+    var currentPlayerIndex: Int = 0,
 ) {
 
     /**
@@ -86,28 +89,17 @@ data class Player(
     /**
      * 是否允许出牌（可用于托管、超时等情况）
      */
-    var canPlay: Boolean = true
+    var canPlay: Boolean = true,
 ) {
     fun addHand(car: Car) {
         hand.find { it.car == car }?.let { it.num++ } ?: run { hand.add(Cards(car)) }
     }
 
-
+    /**
+     * 平展牌打印
+     */
     fun toHand(): String {
-        // 定义排序规则
-        val order = listOf(
-            Car.THREE, Car.FOUR, Car.FIVE, Car.SIX, Car.SEVEN,
-            Car.EIGHT, Car.NINE, Car.TEN, Car.J, Car.Q, Car.K,
-            Car.A, Car.TWO, Car.SMALL_JOKER, Car.BIG_JOKER
-        )
-
-        // 对手牌进行排序
-        val sortedHand = hand.sortedWith(compareBy { order.indexOf(it.car) })
-
-        // 将手牌转换成字符串表示形式
-        return sortedHand.flatMap { card ->
-            List(card.num) { "[" + card.car.marking + "]" }
-        }.joinToString("")
+        return hand.show()
     }
 }
 
@@ -156,6 +148,22 @@ data class Cards(
         fun createFullExpandDeck(): List<Car> {
             return createFullDeck().flatMap { cars -> List(cars.num) { cars.car } }.shuffled()
         }
+
+        /**
+         * 打印牌
+         */
+        @JvmName("showCar")
+        fun List<Car>.show(): String {
+            return sort().joinToString { "$it" }
+        }
+
+        /**
+         * 打印牌
+         */
+        @JvmName("showCars")
+        fun List<Cards>.show(): String {
+            return sort().flatMap { cards -> List(cards.num) { "${cards.car}" } }.joinToString()
+        }
     }
 }
 
@@ -165,24 +173,25 @@ data class Cards(
 enum class Car(
     val value: Int,
     val marking: String,
+    val sort: Int,
 ) {
-    TWO(2, "2"),
-    THREE(3, "3"),
-    FOUR(4, "4"),
-    FIVE(5, "5"),
-    SIX(6, "6"),
-    SEVEN(7, "7"),
-    EIGHT(8, "8"),
-    NINE(9, "9"),
-    TEN(10, "10"),
-    J(11, "J"),
-    Q(12, "Q"),
-    K(13, "K"),
-    A(14, "A"),
+    TWO(2, "2", 3),
+    THREE(3, "3", 15),
+    FOUR(4, "4", 14),
+    FIVE(5, "5", 13),
+    SIX(6, "6", 12),
+    SEVEN(7, "7", 11),
+    EIGHT(8, "8", 10),
+    NINE(9, "9", 9),
+    TEN(10, "10", 8),
+    J(11, "J", 7),
+    Q(12, "Q", 6),
+    K(13, "K", 5),
+    A(14, "A", 4),
 
     // 添加大小王，通常它们没有数值，或者可以根据游戏规则给予特定值
-    SMALL_JOKER(-1, "小王"),  // 小王
-    BIG_JOKER(-2, "大王");      // 大王
+    SMALL_JOKER(-1, "小王", 2),  // 小王
+    BIG_JOKER(-2, "大王", 1);      // 大王
 
     companion object {
         // 如果需要根据字符串查找对应的枚举成员，可以提供一个辅助方法
@@ -193,11 +202,12 @@ enum class Car(
         /**
          * 判断是否连续（允许乱序）
          */
+        @JvmName("continuousCar")
         fun continuous(cars: List<Car>): Boolean {
             if (cars.size <= 1) return false
 
             //链子中不能有大小王和2
-            if (cars.contains(SMALL_JOKER) || cars.contains(BIG_JOKER) || cars.contains(TWO)){
+            if (cars.contains(SMALL_JOKER) || cars.contains(BIG_JOKER) || cars.contains(TWO)) {
                 return false
             }
 
@@ -213,8 +223,31 @@ enum class Car(
         /**
          * 判断是否连续（允许乱序）
          */
+        @JvmName("continuousCards")
         fun continuous(cars: List<Cards>): Boolean {
             return continuous(cars.map { it.car })
         }
+
+        /**
+         * 按照斗地主的牌的大小进行排序
+         */
+        @JvmName("sortCar")
+        fun List<Car>.sort(): List<Car> {
+            return sortedBy { it.sort }
+        }
+
+        /**
+         * 按照斗地主的牌的大小进行排序
+         */
+        @JvmName("sortCards")
+        fun List<Cards>.sort(): List<Cards> {
+            return sortedBy { it.car.sort }
+        }
     }
+
+    override fun toString(): String {
+        return "[$marking]"
+    }
+
+
 }
