@@ -1,12 +1,14 @@
 package cn.chahuyun.doudizhu.game
 
 import cn.chahuyun.doudizhu.*
+import cn.chahuyun.doudizhu.Cards.Companion.show
 import cn.chahuyun.doudizhu.util.MessageUtil.nextMessage
 import cn.chahuyun.doudizhu.util.PlayerUtil
 import kotlinx.coroutines.withTimeoutOrNull
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.MemberPermission
+import net.mamoe.mirai.event.events.MessageEvent
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.PlainText
 
@@ -66,6 +68,7 @@ interface GameTableProcess {
 /**
  * 游戏桌
  */
+@Suppress("SpellCheckingInspection")
 class GameTable(
     /**
      * 玩家
@@ -195,9 +198,7 @@ class GameTable(
 
         group.settings.isMuteAll = true
 
-        game.players.forEach {
-            bot.getFriend(it.id)?.sendMessage("你的手牌:\n ${it.toHand()}")
-        }
+        game.players.forEach { it.sendMessage("你的手牌:\n ${it.toHand()}") }
 
         sendMessage("游戏开始，请移至好友查看手牌!")
     }
@@ -209,24 +210,103 @@ class GameTable(
      */
     override suspend fun dizhu() {
         status = GameStatus.DIZHU
-        val nextPlayer = game.nextPlayer
+        var nextPlayer: Player
 
-        var landlord: Player
+        var landlord: Player? = null
+        // 记录每位玩家是否曾经抢过地主
+        val qiang = players.associateWith { false }.toMutableMap()
+        var round = 1
+        var timer = 0
         while (true) {
-            sendMessage(nextPlayer.id, "开始抢地主:(抢/抢地主)")
-            val nextMessage = nextMessage(nextPlayer)
+            nextPlayer = players[timer % 3]
+            if (round == 1) {
+                //第一轮
+                sendMessage(nextPlayer.id, "开始抢地主:(抢/抢地主)")
+                val nextMessage = nextMessage(nextPlayer) ?: run {
+                    sendMessage("发送超时,(╯‵□′)╯︵┻━┻")
+                    cancelGame()
+                    return
+                }
 
+                val content = nextMessage.message.contentToString()
+                if (content.matches(Regex("^抢|抢地主"))) {
+                    landlord = nextPlayer
+                    qiang[nextPlayer] = true
+                    sendMessage("${nextPlayer.name} 抢地主！")
+                }
+                timer++
+                if (timer == 3) {
+                    //三人操作完成,验证后进行第二轮
+                    round = 2
+                    val stillBidding = qiang.filterValues { it }.keys.toList()
+                    if (stillBidding.size == 1) {
+                        break
+                    } else if (stillBidding.isEmpty()) {
+                        // TODO: 可以后期再决定是否重新发牌/重置游戏
+                        landlord = players.random()
+                        sendMessage("无人角逐地主,那本${DZConfig.botName}就随便指定一个了!恭喜${landlord.name}成功地主!")
+                        break
+                    } else {
+                        continue
+                    }
+                }
+            }
 
+            //第二轮
+            if (round == 2) {
+                if (qiang[nextPlayer]!!) {
+                    sendMessage(nextPlayer.id, "开始角逐抢地主:(抢/抢地主)")
+                    val nextMessage = nextMessage(nextPlayer) ?: run {
+                        sendMessage("发送超时,(╯‵□′)╯︵┻━┻")
+                        cancelGame()
+                        return
+                    }
+
+                    val content = nextMessage.message.contentToString()
+
+                    if (content.matches(Regex("^抢|抢地主"))) {
+                        landlord = nextPlayer
+                        break
+                    } else {
+                        val stillBidding = qiang.filterValues { it }.keys.toList()
+                        if (stillBidding.size == 2) {
+                            //如果是两个人的角逐,排除当前人,直接让另外一个人上位
+                            landlord = stillBidding.first { it != nextPlayer }
+                            break
+                        } else {
+                            //如果不是两个人,则这个人退出角逐,下一个人的角逐必定是2个人,因为一个人在第一轮就已经确定了
+                            qiang[nextPlayer] = false
+                        }
+                    }
+                }
+                timer++
+            }
         }
 
+        if (landlord == null) {
+            sendMessage("系统错误!")
+            return
+        }
 
-        TODO("Not yet implemented")
+        bottomCards.forEach { landlord.addHand(it) }
+        sendMessage(
+            """
+            底牌是:${bottomCards.show()}
+        """.trimIndent()
+        )
+
+        landlord.sendMessage("你的手牌:\n" + " ${landlord.toHand()}")
+        sendMessage("${landlord.name} 抢到了地主!请开始出牌!")
+
+        cards()
     }
 
     /**
      * 出牌?
      */
     override suspend fun cards() {
+        status = GameStatus.BATTLE
+        //进入战斗!
         TODO("Not yet implemented")
     }
 
@@ -250,8 +330,17 @@ class GameTable(
         this.group.sendMessage(At(player.id).plus(PlainText(msg)))
     }
 
+    private suspend fun Player.sendMessage(msg: String) {
+        bot.getFriend(this.id)?.sendMessage(msg)
+    }
+
     private suspend fun GameTable.cancelGame() {
         GameEvent.cancelGame(group)
     }
+
+    /**
+     * 获取好友的下一条消息
+     */
+    suspend fun Player.nextMessage(): MessageEvent? = nextMessage(this, 30)
 }
 
