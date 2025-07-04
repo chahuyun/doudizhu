@@ -2,6 +2,7 @@ package cn.chahuyun.doudizhu
 
 import cn.chahuyun.authorize.PermissionServer
 import net.mamoe.mirai.Bot
+import net.mamoe.mirai.console.extension.PluginComponentStorage
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescription
 import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
 import net.mamoe.mirai.contact.nameCardOrNick
@@ -17,6 +18,9 @@ object DouDiZhu : KotlinPlugin(
     ) {
         author("moyuyanli")
         info("FeaFox-DouDiZhu")
+
+        dependsOn("cn.chahuyun.HuYanAuthorize", ">=1.2.0", true)
+//        dependsOn("cn.chahuyun.HuYanEconomy",">=1.7.6",true)
     }
 ) {
     /**
@@ -33,11 +37,16 @@ object DouDiZhu : KotlinPlugin(
      * 全局息事件通道
      */
     lateinit var channel: EventChannel<MessageEvent>
+
+    override fun PluginComponentStorage.onLoad() {
+        logger.debug("fox doudizhu 开始加载!")
+    }
+
     override fun onEnable() {
+        logger.debug("fox doudizhu 启动中...")
         DZConfig.reload()
 
         PermissionServer.registerMessageEvent(this, "cn.chahuyun.doudizhu")
-
 
         val scope = GlobalEventChannel.parentScope(this)
         this@DouDiZhu.scope = scope
@@ -50,5 +59,30 @@ object DouDiZhu : KotlinPlugin(
 
 
     override fun onDisable() {
+        logger.debug("fox doudizhu 已卸载...")
+    }
+
+    fun info(msg: String) {
+        logger.info(msg)
+    }
+
+    fun warning(msg: String) {
+        logger.warning(msg)
+    }
+
+    fun debug(msg: String) {
+        logger.debug(msg)
+    }
+
+    fun error(msg: String) {
+        logger.error(msg)
+    }
+
+    fun error(msg: String, e: Throwable?) {
+        logger.error(msg, e)
+    }
+
+    fun error(e: Throwable?) {
+        logger.error(e)
     }
 }
