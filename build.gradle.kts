@@ -1,3 +1,5 @@
+import java.net.URI
+
 plugins {
     val kotlinVersion = "1.9.23"
     id("org.jetbrains.kotlin.jvm") version kotlinVersion
@@ -18,7 +20,7 @@ repositories {
 dependencies {
 
     //依赖
-    compileOnly("cn.chahuyun:HuYanEconomy:1.7.6")
+    compileOnly("cn.chahuyun:HuYanEconomy:1.7.7")
     compileOnly("cn.chahuyun:HuYanAuthorize:1.2.0")
 
     //使用库
