@@ -41,7 +41,7 @@ class GameEvent {
             gameTables[group.id] = GameTable(listOf(), event.bot, group)
         }
 
-        group.sendMessage("${sender.nick} 开启了一桌游戏，快快发送 加入对局|┳━┳ 加入对局进行游戏吧!")
+        group.sendMessage("${sender.nick} 开启了一桌游戏，快快发送 加入对局 加入对局进行游戏吧!")
 
         // 使用可变列表来添加玩家
         val players = mutableListOf(Player(sender.id, sender.nameCard))
@@ -54,7 +54,7 @@ class GameEvent {
                 return // 如果超时则退出
             }
 
-            if (messageEvent.message.contentToString().matches("^加入|对局|来|┳━┳".toRegex())) { // 检查消息内容是否为加入请求
+            if (messageEvent.message.contentToString().matches("^加入|对局|来".toRegex())) { // 检查消息内容是否为加入请求
                 val newPlayer = Player(messageEvent.sender.id, messageEvent.sender.nick)
                 if (!players.any { it.id == newPlayer.id }) { // 防止重复加入
                     players.add(newPlayer)
