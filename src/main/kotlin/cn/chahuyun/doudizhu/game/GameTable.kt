@@ -4,7 +4,9 @@ import cn.chahuyun.doudizhu.*
 import cn.chahuyun.doudizhu.Car.Companion.toListCards
 import cn.chahuyun.doudizhu.Cards.Companion.cardsShow
 import cn.chahuyun.doudizhu.Cards.Companion.show
-import cn.chahuyun.doudizhu.Cards.Companion.toListCar
+import cn.chahuyun.doudizhu.FoxUserManager.addLose
+import cn.chahuyun.doudizhu.FoxUserManager.addVictory
+import cn.chahuyun.doudizhu.FoxUserManager.getFoxUser
 import cn.chahuyun.doudizhu.game.CardFormUtil.check
 import cn.chahuyun.doudizhu.util.MessageUtil.nextMessage
 import cn.chahuyun.doudizhu.util.PlayerUtil
@@ -14,7 +16,11 @@ import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.MemberPermission
 import net.mamoe.mirai.event.events.MessageEvent
 import net.mamoe.mirai.message.data.At
+import net.mamoe.mirai.message.data.MessageChain
+import net.mamoe.mirai.message.data.MessageChainBuilder
 import net.mamoe.mirai.message.data.PlainText
+import kotlin.math.floor
+import kotlin.math.roundToInt
 
 /**
  * 一个游戏桌上的对局状态
@@ -96,18 +102,12 @@ class GameTable(
      */
     private val deck: List<Car> = Cards.createFullExpandDeck(),
 
-    ) : GameTableProcess {
+    /**
+     * 默认对局类型
+     */
+    private val type: GameTableCoinsType = GameTableCoinsType.NORMAL
 
-    companion object {
-        //回复超时时间
-        private const val CONFIG_TIMEOUT_SECONDS = 30L
-
-        //最低底分
-        private const val MIN_BET = 1
-
-        //最高底分
-        private const val MAX_BET = 1000
-    }
+) : GameTableProcess {
 
     /**
      * 对局信息
@@ -147,12 +147,21 @@ class GameTable(
             }
         }
 
-        val player = players[0]
-        sendMessage(player.id, "请配置底分($MIN_BET~$MAX_BET),发送掀桌停止!")
 
-        var bottom = 0
-        while (bottom == 0) {
-            val nextMessage = nextMessage(player, CONFIG_TIMEOUT_SECONDS.toInt()) ?: run {
+        val votes = mutableMapOf<Long, Int>() // key: 玩家ID, value: 输入的底分
+
+        val message = MessageChainBuilder().apply {
+            players.forEach { player ->
+                +At(player.id)
+            }
+            +"请有序投票底分(${type.min}~${type.max})，发送“掀桌”停止配置"
+        }.build()
+
+        sendMessage(message)
+
+        // 开始收集输入
+        for (player in players) {
+            val nextMessage = nextMessage(player, DZConfig.timeOut) ?: run {
                 sendMessage("配置超时,(╯‵□′)╯︵┻━┻")
                 cancelGame()
                 return
@@ -161,21 +170,31 @@ class GameTable(
             val input = nextMessage.message.contentToString().trim()
 
             if (input == "掀桌") {
-                sendMessage("${player.name} 停止了对局!")
+                sendMessage("${player.name} 掀桌(╯‵□′)╯︵┻━┻")
                 cancelGame()
                 return
             }
 
             val bet = input.toIntOrNull()
-            if (bet != null && bet in MIN_BET..MAX_BET) {
+            if (bet != null && bet in type.min..type.max) {
+                votes[player.id] = bet
                 sendMessage("${player.name} 配置底分为: $bet!")
-                bottom = bet
             } else {
-                sendMessage("请输入有效的底分（$MIN_BET~${MAX_BET}）")
+                sendMessage("${player.name} 输入无效，底分范围为 ${type.min}~${type.max}，已跳过本轮投票。")
+                votes[player.id] = type.min // 可选：默认最小值
             }
         }
 
-        game = Game(players, group.id, bottom, 1)
+        // 计算平均值
+        val total = votes.values.sum()
+        // 平均值
+        val average = total / votes.size.toDouble()
+        // 向下取整
+        val finalBet = floor(average).roundToInt()
+
+        sendMessage("三人输入底分分别为：${votes.values.joinToString(",")}，最终底分为：$finalBet")
+
+        game = Game(players, group.id, finalBet, 1)
 
         // 分配底牌
         bottomCards = deck.take(3)
@@ -228,7 +247,7 @@ class GameTable(
             if (round == 1) {
                 //第一轮
                 sendMessage(nextPlayer.id, "开始抢地主:(抢/抢地主)")
-                val nextMessage = nextMessage(nextPlayer) ?: run {
+                val nextMessage = nextMessage(nextPlayer,DZConfig.timeOut) ?: run {
                     sendMessage("发送超时,(╯‵□′)╯︵┻━┻")
                     cancelGame()
                     return
@@ -264,7 +283,7 @@ class GameTable(
             if (round == 2) {
                 if (qiang[nextPlayer]!!) {
                     sendMessage(nextPlayer.id, "开始角逐抢地主:(抢/抢地主)")
-                    val nextMessage = nextMessage(nextPlayer) ?: run {
+                    val nextMessage = nextMessage(nextPlayer,DZConfig.timeOut) ?: run {
                         sendMessage("发送超时,(╯‵□′)╯︵┻━┻")
                         cancelGame()
                         return
@@ -303,10 +322,12 @@ class GameTable(
         if (bottomCards.toListCards().size == 1) {
             sendMessage("底牌是3连:${bottomCards.show()},翻倍!")
             game.fold *= 2
-        }else if (bottomCards.toListCards().contains(Car.BIG_JOKER) && bottomCards.toListCards().contains(Car.SMALL_JOKER)){
+        } else if (bottomCards.toListCards().contains(Car.BIG_JOKER) && bottomCards.toListCards()
+                .contains(Car.SMALL_JOKER)
+        ) {
             sendMessage("底牌是王炸:${bottomCards.show()},翻倍!")
             game.fold *= 2
-        }else{
+        } else {
             sendMessage("底牌是:${bottomCards.show()}")
         }
 
@@ -353,7 +374,7 @@ class GameTable(
             if (player.playCards(cards)) {
                 sendMessage(msg)
                 val handSize = player.hand.sumOf { it.num }
-                if (0 < handSize && handSize  <= 3) {
+                if (handSize in 1..3) {
                     sendMessage("${player.name} 只剩 $handSize 张牌了!")
                 }
 
@@ -369,7 +390,7 @@ class GameTable(
             val isFirst = maxPlayer == null || maxPlayer == player
             sendMessage(player, "请出牌!" + if (isFirst) "" else "或者过")
 
-            val nextMessage = player.nextMessage(60) ?: run {
+            val nextMessage = player.nextMessage(DZConfig.timeOut) ?: run {
                 sendMessage("${player.name} 出牌超时,导致对局消失,大家快去骂他呀!")
                 cancelGame()
                 return
@@ -379,7 +400,6 @@ class GameTable(
 
             // 处理"过"的情况
             if (!isFirst && content.matches(Regex("过|不要|要不起"))) {
-//                sendMessage("${player.name} 要不起,过!")
                 player = game.nextPlayer
                 continue
             }
@@ -405,7 +425,7 @@ class GameTable(
                     continue
                 }
 
-                if (match == CardForm.BOMB || match == CardForm.GHOST_BOMB){
+                if (match == CardForm.BOMB || match == CardForm.GHOST_BOMB) {
                     game.fold *= 2
                 }
 
@@ -455,6 +475,21 @@ class GameTable(
         val winName = game.winPlayer.joinToString(",") { it.name }
         val integral = game.bottom * game.fold
         sendMessage("$winName 是赢家! 获得积分:$integral")
+
+        val winPlayer = game.winPlayer
+        val losePlayer = players.filter { it !in winPlayer }
+
+        if (winPlayer.size == 1) {
+            getFoxUser(winPlayer.first()).addVictory(integral)
+            losePlayer.forEach {
+                getFoxUser(it).addLose(integral / 2)
+            }
+        } else {
+            winPlayer.forEach {
+                getFoxUser(it).addVictory(integral / 2)
+            }
+            getFoxUser(losePlayer.first()).addLose(integral)
+        }
 
         players.forEach { group[it.id]?.modifyAdmin(false) }
         group.settings.isMuteAll = false
@@ -521,6 +556,10 @@ class GameTable(
     //==游戏过程辅助私有方法
 
     private suspend fun GameTable.sendMessage(msg: String) {
+        this.group.sendMessage(msg)
+    }
+
+    private suspend fun GameTable.sendMessage(msg: MessageChain) {
         this.group.sendMessage(msg)
     }
 
