@@ -4,6 +4,7 @@ import cn.chahuyun.doudizhu.*
 import cn.chahuyun.doudizhu.Car.Companion.toListCards
 import cn.chahuyun.doudizhu.Cards.Companion.cardsShow
 import cn.chahuyun.doudizhu.Cards.Companion.show
+import cn.chahuyun.doudizhu.Cards.Companion.toListCar
 import cn.chahuyun.doudizhu.game.CardFormUtil.check
 import cn.chahuyun.doudizhu.util.MessageUtil.nextMessage
 import cn.chahuyun.doudizhu.util.PlayerUtil
@@ -130,9 +131,9 @@ class GameTable(
             return
         }
 
-        sendMessage("游戏开始,请在1分钟内添加本bot的好友!")
+        sendMessage("游戏开始,请在2分钟内添加本bot的好友!")
 
-        withTimeoutOrNull(60 * 1000L) {
+        withTimeoutOrNull(120 * 1000L) {
             val util = PlayerUtil(players)
             if (util.check()) return@withTimeoutOrNull
             if (util.listening()) return@withTimeoutOrNull
@@ -174,7 +175,7 @@ class GameTable(
             }
         }
 
-        game = Game(players, group.id, bottom, 0)
+        game = Game(players, group.id, bottom, 1)
 
         // 分配底牌
         bottomCards = deck.take(3)
@@ -273,6 +274,7 @@ class GameTable(
 
                     if (content.matches(Regex("^抢|抢地主"))) {
                         landlord = nextPlayer
+                        game.fold *= 2
                         break
                     } else {
                         val stillBidding = qiang.filterValues { it }.keys.toList()
@@ -297,11 +299,16 @@ class GameTable(
         }
 
         bottomCards.forEach { landlord.addHand(it) }
-        sendMessage(
-            """
-            底牌是:${bottomCards.show()}
-        """.trimIndent()
-        )
+
+        if (bottomCards.toListCards().size == 1) {
+            sendMessage("底牌是3连:${bottomCards.show()},翻倍!")
+            game.fold *= 2
+        }else if (bottomCards.toListCards().contains(Car.BIG_JOKER) && bottomCards.toListCards().contains(Car.SMALL_JOKER)){
+            sendMessage("底牌是王炸:${bottomCards.show()},翻倍!")
+            game.fold *= 2
+        }else{
+            sendMessage("底牌是:${bottomCards.show()}")
+        }
 
         game.landlord = landlord
         game.setNextPlayer(landlord)
@@ -325,18 +332,28 @@ class GameTable(
         var maxCards: List<Cards> = mutableListOf()
         // 比较的牌类型
         var maxForm: CardForm = CardForm.ERROR
-        var win: Player? = null
+        var win: Player
 
         // 提取出牌后的公共操作
         suspend fun handlePlay(player: Player, cards: List<Cards>, match: CardForm, isFirst: Boolean) {
             val action = if (isFirst) "出牌" else "管上"
+            val msg = when (match) {
+                CardForm.BOMB -> "${player.name} : 炸弹(翻倍)! ${cards.cardsShow()}"
+                CardForm.TRIPLE_ONE -> "${player.name} : 三带一! ${cards.cardsShow()}"
+                CardForm.TRIPLE_TWO -> "${player.name} : 三带二! ${cards.cardsShow()}"
+                CardForm.QUEUE -> "${player.name} : 顺子! ${cards.cardsShow()}"
+                CardForm.GHOST_BOMB -> "${player.name} : 王炸(翻倍)!!!"
+                CardForm.QUEUE_TWO -> "${player.name} : 连对! ${cards.cardsShow()}"
+                CardForm.AIRCRAFT -> "${player.name} : 飞机! ${cards.cardsShow()}"
+                CardForm.AIRCRAFT_SINGLE -> "${player.name} : 飞机! ${cards.cardsShow()}"
+                CardForm.AIRCRAFT_PAIR -> "${player.name} : 飞机! ${cards.cardsShow()}"
+                else -> "${player.name} : $action ${cards.cardsShow()}"
+            }
 
             if (player.playCards(cards)) {
-                sendMessage("${player.name} $action ${cards.cardsShow()}")
-                player.sendMessage(player.toHand())
-
-                val handSize = player.hand.size
-                if (handSize <= 2) {
+                sendMessage(msg)
+                val handSize = player.hand.sumOf { it.num }
+                if (0 < handSize && handSize  <= 3) {
                     sendMessage("${player.name} 只剩 $handSize 张牌了!")
                 }
 
@@ -362,13 +379,13 @@ class GameTable(
 
             // 处理"过"的情况
             if (!isFirst && content.matches(Regex("过|不要|要不起"))) {
-                sendMessage("${player.name} 要不起,过!")
+//                sendMessage("${player.name} 要不起,过!")
                 player = game.nextPlayer
                 continue
             }
 
             // 处理出牌的情况
-            if (content.matches(Regex("^[0-9AJQK大小王]{1,20}$"))) {
+            if (content.matches(Regex("^[0-9aAjJqQkK大小王炸]{1,20}$"))) {
                 val listCar = parseCardInput(content)
                 if (listCar.isEmpty()) {
                     sendMessage(player, "出牌格式错误，请按正确格式出牌！")
@@ -388,9 +405,13 @@ class GameTable(
                     continue
                 }
 
+                if (match == CardForm.BOMB || match == CardForm.GHOST_BOMB){
+                    game.fold *= 2
+                }
+
                 // 检查牌型是否有效（如果是跟牌）
                 if (!isFirst && !checkEat(maxForm, match, maxCards, cards)) {
-                    sendMessage(player, "你的出牌要不起这个!")
+                    sendMessage(player, "你要不起!")
                     continue
                 }
 
@@ -401,6 +422,8 @@ class GameTable(
                 if (player.hand.isEmpty()) {
                     win = player
                     break
+                } else {
+                    player.sendMessage(player.toHand())
                 }
 
                 // 轮到下一位玩家
@@ -410,9 +433,13 @@ class GameTable(
             }
         }
 
-        win?.let {
-            sendMessage("${it.name} 获胜!")
-        } ?: sendMessage("游戏结束，但无人获胜?!")
+        sendMessage("${win.name} 获胜!")
+
+        if (game.landlord == win) {
+            game.winPlayer.add(win)
+        } else {
+            game.winPlayer.addAll(game.players.filter { it != game.landlord })
+        }
 
         stop()
     }
@@ -424,6 +451,11 @@ class GameTable(
     override suspend fun stop() {
         status = GameStatus.STOP
         sendMessage("进入结算!")
+
+        val winName = game.winPlayer.joinToString(",") { it.name }
+        val integral = game.bottom * game.fold
+        sendMessage("$winName 是赢家! 获得积分:$integral")
+
         players.forEach { group[it.id]?.modifyAdmin(false) }
         group.settings.isMuteAll = false
         cancelGame()
@@ -438,7 +470,7 @@ class GameTable(
      */
     private fun parseCardInput(input: String): List<Car> {
         val cards = mutableListOf<String>()
-        val regex = Regex("10|大王|小王|[2-9AJQK]|0")
+        val regex = Regex("10|大王|小王|王炸|[2-9aAjJqQkK]|0")
         var remaining = input
 
         while (remaining.isNotEmpty()) {
@@ -447,6 +479,9 @@ class GameTable(
                 return emptyList()
 
             val card = match.value
+            if (card == "王炸") {
+                return listOf(Car.BIG_JOKER, Car.SMALL_JOKER)
+            }
             cards.add(
                 when (card) {
                     "0" -> "10"  // 将0转换为10
