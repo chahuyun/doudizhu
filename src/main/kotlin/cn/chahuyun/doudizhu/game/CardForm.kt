@@ -93,12 +93,8 @@ object CardFormUtil {
      * 穷尽了！
      */
     fun match(cards: List<Cards>): CardForm {
-
-        /**
-         * 排序
-         */
+        //排序
         val sort = cards.sortNum()
-
         //总牌数量
         val sizeNum = cards.sumOf { it.num }
         //牌型数量
@@ -245,6 +241,7 @@ object CardFormUtil {
 
             CardForm.BOMB -> now.getMaxValue() > max.getMaxValue()
             CardForm.AIRCRAFT -> now.sort().getMaxValue() > max.sort().getMaxValue()
+            //todo 这里有bug，飞机长度没有判断
             CardForm.AIRCRAFT_SINGLE ->
                 now.sortNum().filter { it.num != 1 }.sort().getMaxValue() > max.sortNum().filter { it.num != 1 }.sort()
                     .getMaxValue()

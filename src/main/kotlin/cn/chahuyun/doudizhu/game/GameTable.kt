@@ -264,7 +264,6 @@ class GameTable(
                 timer++
                 if (timer == 3) {
                     //三人操作完成,验证后进行第二轮
-                    round = 2
                     val stillBidding = qiang.filterValues { it }.keys.toList()
                     if (stillBidding.size == 1) {
                         break
@@ -274,6 +273,7 @@ class GameTable(
                         sendMessage("无人角逐地主,那本${DZConfig.botName}就随便指定一个了!恭喜${landlord.name}成功地主!")
                         break
                     } else {
+                        round = 2
                         continue
                     }
                 }
@@ -293,7 +293,6 @@ class GameTable(
 
                     if (content.matches(Regex("^抢|抢地主"))) {
                         landlord = nextPlayer
-                        game.fold *= 2
                         break
                     } else {
                         val stillBidding = qiang.filterValues { it }.keys.toList()
@@ -334,7 +333,12 @@ class GameTable(
         game.landlord = landlord
         game.setNextPlayer(landlord)
         landlord.sendMessage("你的手牌:\n" + " ${landlord.toHand()}")
-        sendMessage("${landlord.name} 抢到了地主!请开始出牌!")
+        if (round == 2) {
+            game.fold *= 2
+            sendMessage("${landlord.name} 角逐胜者,翻倍!请开始出牌!")
+        }else{
+            sendMessage("${landlord.name} 抢到了地主!请开始出牌!")
+        }
 
         cards()
     }
@@ -575,7 +579,7 @@ class GameTable(
         bot.getFriend(this.id)?.sendMessage(msg)
     }
 
-    private suspend fun GameTable.cancelGame() {
+    private fun GameTable.cancelGame() {
         GameEvent.cancelGame(group)
     }
 
