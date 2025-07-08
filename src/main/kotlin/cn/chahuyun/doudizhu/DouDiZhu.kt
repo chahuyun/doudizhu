@@ -45,6 +45,9 @@ object DouDiZhu : KotlinPlugin(
     override fun onEnable() {
         logger.debug("fox doudizhu 启动中...")
         DZConfig.reload()
+        DZDataConfig.reload()
+
+        DataManager.init()
 
         PermissionServer.registerMessageEvent(this, "cn.chahuyun.doudizhu")
 
