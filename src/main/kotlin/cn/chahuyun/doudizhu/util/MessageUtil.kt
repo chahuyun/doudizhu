@@ -2,6 +2,7 @@ package cn.chahuyun.doudizhu.util
 
 import cn.chahuyun.doudizhu.DouDiZhu
 import cn.chahuyun.doudizhu.Player
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withTimeoutOrNull
@@ -50,8 +51,12 @@ object MessageUtil {
      * @return 收到的消息事件（[MessageEvent]），如果没有收到则挂起直到有消息
      */
     suspend fun nextGroupMessage(groupId: Long): MessageEvent? = callbackFlow {
-        DouDiZhu.channel.filter { it.subject.id == groupId }
+        val once = DouDiZhu.channel.filter { it.subject.id == groupId }
             .subscribeOnce<GroupMessageEvent> { trySend(it) }
+        // 当 callbackFlow 结束时取消监听器
+        awaitClose {
+            once.complete()
+        }
     }.firstOrNull()
 
     /**
@@ -82,7 +87,10 @@ object MessageUtil {
      * @return 收到的消息事件（[MessageEvent]），如果没有收到则挂起直到有消息
      */
     suspend fun nextMessage(senderId: Long): MessageEvent? = callbackFlow {
-        DouDiZhu.channel.filter { it.sender.id == senderId }
+        val once = DouDiZhu.channel.filter { it.sender.id == senderId }
             .subscribeOnce<MessageEvent> { trySend(it) }
+        awaitClose {
+            once.complete()
+        }
     }.firstOrNull()
 }
