@@ -1,8 +1,7 @@
-package cn.chahuyun.doudizhu
+package cn.chahuyun.doudizhu.data
 
-import cn.chahuyun.economy.entity.UserInfo
 import jakarta.persistence.*
-import java.util.*
+import java.time.LocalDateTime
 
 /**
  * 玩家信息
@@ -14,9 +13,6 @@ data class FoxUser(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Int? = null,
 
-    @OneToOne(mappedBy = "user")
-    var user: UserInfo? = null,
-
     /**
      * 玩家id qq
      */
@@ -26,9 +22,9 @@ data class FoxUser(
      */
     var name: String? = null,
     /**
-     * 玩家积分
+     * 玩家狐币
      */
-    var score: Int? = null,
+    var coins: Int? = null,
     /**
      * 玩家胜利次数
      */
@@ -37,6 +33,28 @@ data class FoxUser(
      * 玩家失败次数
      */
     var lose: Int? = null,
+
+
+    /**
+     * 玩家 狐币 领取记录
+     */
+    @OneToOne(cascade = [CascadeType.ALL], orphanRemoval = true)
+    @JoinColumn(
+        name = "fox_coins_id",
+        foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT)
+    )
+    var foxCoins: FoxCoins? = null,
+
+
+    /**
+     * 玩家游戏工具
+     */
+    @OneToOne(cascade = [CascadeType.ALL], orphanRemoval = true)
+    @JoinColumn(
+        name = "fox_game_id",
+        foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT)
+    )
+    var foxGame: FoxGameAuxiliary? = null,
 )
 
 /**
@@ -49,9 +67,6 @@ data class FoxGameAuxiliary(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Int? = null,
 
-    @OneToOne(mappedBy = "fox_user")
-    var foxUser: FoxUser? = null,
-
     /**
      * 记牌器
      */
@@ -60,7 +75,7 @@ data class FoxGameAuxiliary(
     /**
      * 记牌器时效
      */
-    var aScorerTime: Date? = null,
+    var aScorerTime: LocalDateTime? = null,
 
     /**
      * 超级加倍特权
@@ -70,7 +85,7 @@ data class FoxGameAuxiliary(
     /**
      * 超级加倍特权时效
      */
-    var superDoubleTime: Date? = null,
+    var superDoubleTime: LocalDateTime? = null,
 )
 
 /**
@@ -83,13 +98,10 @@ data class FoxCoins(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Int? = null,
 
-    @OneToOne(mappedBy = "fox_user")
-    var foxUser: FoxUser? = null,
-
     /**
      * 领取时间
      */
-    var time: Date? = null,
+    var time: LocalDateTime? = null,
 
     /**
      * 领取次数
