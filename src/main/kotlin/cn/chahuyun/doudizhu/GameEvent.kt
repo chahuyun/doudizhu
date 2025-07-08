@@ -6,6 +6,7 @@ import cn.chahuyun.doudizhu.DouDiZhu.debug
 import cn.chahuyun.doudizhu.game.GameTable
 import cn.chahuyun.doudizhu.util.MessageUtil.nextGroupMessage
 import net.mamoe.mirai.contact.Group
+import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.events.GroupMessageEvent
 
 /**
@@ -44,11 +45,10 @@ class GameEvent {
         group.sendMessage("${sender.nick} 开启了一桌游戏，快快发送 加入对局 加入对局进行游戏吧!")
 
         // 使用可变列表来添加玩家
-        val players = mutableListOf(Player(sender.id, sender.nameCard))
+        val players = mutableListOf(Player(sender.id, sender.nameCardOrNick))
 
-        debug("while")
+        debug("等待加入游戏!")
         while (players.size < 3) {
-            debug("等待加入游戏!")
             val messageEvent = nextGroupMessage(group) ?: run {
                 group.sendMessage("等待玩家加入超时，游戏未能开始。")
                 return // 如果超时则退出
