@@ -196,7 +196,10 @@ enum class Car(
     companion object {
         // 如果需要根据字符串查找对应的枚举成员，可以提供一个辅助方法
         fun fromMarking(marking: String): Car? {
-            return values().find { it.marking.equals(marking, ignoreCase = true) }
+            val normalized = marking.trim().uppercase()
+            return entries.find {
+                it.marking == normalized
+            }
         }
 
         /**
