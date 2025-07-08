@@ -2,6 +2,7 @@ package cn.chahuyun.doudizhu.util
 
 import cn.chahuyun.doudizhu.DouDiZhu
 import cn.chahuyun.doudizhu.Player
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.firstOrNull
 import net.mamoe.mirai.event.ListeningStatus
@@ -36,7 +37,7 @@ class PlayerUtil(private val players:List<Player>) {
      */
     suspend fun listening(): Boolean {
         return callbackFlow {
-            DouDiZhu.scope.subscribe<NewFriendRequestEvent> { event ->
+            val subscribe = DouDiZhu.scope.subscribe<NewFriendRequestEvent> { event ->
                 val player = unFriend.find { it.id == event.fromId }
                 if (player != null) {
                     unFriend.remove(player)
@@ -51,6 +52,9 @@ class PlayerUtil(private val players:List<Player>) {
                     event.reject(false)
                     ListeningStatus.LISTENING
                 }
+            }
+            awaitClose{
+                subscribe.complete()
             }
         }.firstOrNull() ?: false
     }
