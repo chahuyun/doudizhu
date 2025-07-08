@@ -14,7 +14,7 @@ import net.mamoe.mirai.event.events.MessageEvent
 
 object DouDiZhu : KotlinPlugin(
     JvmPluginDescription(
-        "cn.chahuyun.doudizhu", "1.0.0", "斗地主"
+        "cn.chahuyun.doudizhu", "1.0.0", "Fox-doudizhu"
     ) {
         author("moyuyanli")
         info("FeaFox-DouDiZhu")
