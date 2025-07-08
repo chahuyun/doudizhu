@@ -328,3 +328,18 @@ enum class Car(
 
 
 }
+
+/**
+ * 游戏桌对局大小类型
+ */
+enum class GameTableCoinsType(
+    val min: Int, val max: Int,
+    /**
+     * 保底
+     */
+    val guaranteed: Int
+) {
+    NORMAL(10, 50, 100),
+    BIG(50, 200, 400),
+    HUGE(200, 1000, 2000)
+}
