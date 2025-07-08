@@ -32,6 +32,10 @@ data class Game(
      * 当前轮到哪个玩家出牌（索引）
      */
     var currentPlayerIndex: Int = 0,
+    /**
+     * 赢家
+     */
+    var winPlayer: MutableList<Player> = mutableListOf()
 ) {
 
     /**
