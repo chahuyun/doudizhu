@@ -2,6 +2,7 @@ package cn.chahuyun.doudizhu
 
 import cn.chahuyun.doudizhu.Car.Companion.sort
 import cn.chahuyun.doudizhu.Cards.Companion.show
+import cn.chahuyun.doudizhu.Cards.Companion.toListCar
 
 /**
  * 对局
@@ -44,7 +45,7 @@ data class Game(
     val nextPlayer: Player
         get() {
             for (i in 1..players.size) {
-                val index = (currentPlayerIndex + i) % players.size
+                val index = (currentPlayerIndex++ + i) % players.size
                 val player = players[index]
                 if (player.hand.isNotEmpty()) {
                     return player
@@ -57,9 +58,9 @@ data class Game(
      * 手动设置下一个出牌人
      */
     fun setNextPlayer(player: Player) {
-        val index = players.indexOf(player)
+        var index = players.indexOf(player)
         if (index >= 0) {
-            currentPlayerIndex = index
+            currentPlayerIndex = --index
         } else {
             error("Player not found in the game.")
         }
@@ -100,6 +101,50 @@ data class Player(
      */
     fun toHand(): String {
         return hand.show()
+    }
+
+    /**
+     * 检查手牌是否足够出牌
+     * @return true 够出
+     */
+    fun checkHand(cards: List<Car>): Boolean {
+        // 将手牌转换为计数映射
+        val handCountMap = hand.associate { it.car to it.num }
+
+        // 将要出的牌分组计数
+        val playCountMap = cards.groupingBy { it }.eachCount()
+
+        // 检查每种牌的数量是否足够
+        return playCountMap.all { (car, count) ->
+            handCountMap[car]?.let { it >= count } ?: false
+        }
+    }
+
+    /**
+     * 出牌 - 从手牌中移除指定的牌
+     * @param cardsToPlay 要出的牌
+     * @return 出牌是否成功
+     */
+    fun playCards(cardsToPlay: List<Cards>): Boolean {
+        // 先检查手牌是否足够
+        if (!checkHand(cardsToPlay.toListCar())) {
+            return false
+        }
+
+        // 从手牌中移除牌
+        cardsToPlay.forEach { cardToPlay ->
+            val handCard = hand.find { it.car == cardToPlay.car }
+            if (handCard != null) {
+                handCard.num -= cardToPlay.num
+
+                // 如果数量减到0以下或等于0，从手牌中移除
+                if (handCard.num <= 0) {
+                    hand.remove(handCard)
+                }
+            }
+        }
+
+        return true
     }
 }
 
@@ -164,6 +209,22 @@ data class Cards(
         fun List<Cards>.show(): String {
             return sort().flatMap { cards -> List(cards.num) { "${cards.car}" } }.joinToString()
         }
+
+        /**
+         * 打印牌
+         */
+        @JvmName("cardsShow")
+        fun List<Cards>.cardsShow(): String {
+            return sort().reversed().flatMap { cards -> List(cards.num) { "${cards.car}" } }.joinToString()
+        }
+
+
+        // 添加扩展函数将List<Cards>转换为List<Car>
+        @JvmName("toListCar")
+        fun List<Cards>.toListCar(): List<Car> {
+            return flatMap { cards -> List(cards.num) { cards.car } }
+        }
+
     }
 }
 
@@ -175,23 +236,23 @@ enum class Car(
     val marking: String,
     val sort: Int,
 ) {
-    TWO(2, "2", 3),
-    THREE(3, "3", 15),
-    FOUR(4, "4", 14),
-    FIVE(5, "5", 13),
-    SIX(6, "6", 12),
-    SEVEN(7, "7", 11),
-    EIGHT(8, "8", 10),
-    NINE(9, "9", 9),
+    TWO(2, "2", 13),
+    THREE(3, "3", 1),
+    FOUR(4, "4", 2),
+    FIVE(5, "5", 3),
+    SIX(6, "6", 4),
+    SEVEN(7, "7", 5),
+    EIGHT(8, "8", 6),
+    NINE(9, "9", 7),
     TEN(10, "10", 8),
-    J(11, "J", 7),
-    Q(12, "Q", 6),
-    K(13, "K", 5),
-    A(14, "A", 4),
+    J(11, "J", 9),
+    Q(12, "Q", 10),
+    K(13, "K", 11),
+    A(14, "A", 12),
 
     // 添加大小王，通常它们没有数值，或者可以根据游戏规则给予特定值
-    SMALL_JOKER(-1, "小王", 2),  // 小王
-    BIG_JOKER(-2, "大王", 1);      // 大王
+    SMALL_JOKER(-1, "小王", 14),  // 小王
+    BIG_JOKER(-2, "大王", 15);      // 大王
 
     companion object {
         // 如果需要根据字符串查找对应的枚举成员，可以提供一个辅助方法
@@ -236,7 +297,7 @@ enum class Car(
          */
         @JvmName("sortCar")
         fun List<Car>.sort(): List<Car> {
-            return sortedBy { it.sort }
+            return sortedByDescending { it.sort }
         }
 
         /**
@@ -244,7 +305,16 @@ enum class Car(
          */
         @JvmName("sortCards")
         fun List<Cards>.sort(): List<Cards> {
-            return sortedBy { it.car.sort }
+            return sortedByDescending { it.car.sort }
+        }
+
+
+        // 添加扩展函数将List<Car>转换为List<Cards>
+        @JvmName("toListCards")
+        fun List<Car>.toListCards(): List<Cards> {
+            return this.groupingBy { it }
+                .eachCount()
+                .map { (car, count) -> Cards(car, count) }
         }
     }
 
