@@ -19,7 +19,7 @@ object DouDiZhu : KotlinPlugin(
         author("moyuyanli")
         info("FeaFox-DouDiZhu")
 
-        dependsOn("cn.chahuyun.HuYanAuthorize", ">=1.2.0", true)
+        dependsOn("cn.chahuyun.HuYanAuthorize", ">=1.2.0", false)
 //        dependsOn("cn.chahuyun.HuYanEconomy",">=1.7.6",true)
     }
 ) {
