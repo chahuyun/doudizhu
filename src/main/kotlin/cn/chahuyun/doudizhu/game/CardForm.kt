@@ -2,7 +2,9 @@ package cn.chahuyun.doudizhu.game
 
 import cn.chahuyun.doudizhu.Car
 import cn.chahuyun.doudizhu.Car.Companion.continuous
+import cn.chahuyun.doudizhu.Car.Companion.sort
 import cn.chahuyun.doudizhu.Cards
+import cn.chahuyun.doudizhu.Cards.Companion.toListCar
 
 /**
  * 牌型
@@ -95,7 +97,7 @@ object CardFormUtil {
         /**
          * 排序
          */
-        val sort = cards.sort()
+        val sort = cards.sortNum()
 
         //总牌数量
         val sizeNum = cards.sumOf { it.num }
@@ -223,6 +225,46 @@ object CardFormUtil {
             else -> CardForm.ERROR
         }
     }
+
+    /**
+     * 检查能不能吃的起
+     * @return true 吃得起
+     */
+    fun CardForm.check(max: List<Cards>, now: List<Cards>): Boolean {
+        return when (this) {
+            CardForm.SINGLE -> now.getMaxValue() > max.getMaxValue()
+            CardForm.PAIR -> now.getMaxValue() > max.getMaxValue()
+            CardForm.TRIPLE -> now.sortNum().getMaxValue() > max.sortNum().getMaxValue()
+            CardForm.TRIPLE_ONE -> now.sortNum().getMaxValue() > max.sortNum().getMaxValue()
+            CardForm.TRIPLE_TWO -> now.sortNum().getMaxValue() > max.sortNum().getMaxValue()
+            CardForm.QUEUE -> if (max.size != now.size) return false else
+                now.sort().getMaxValue() > max.sort().getMaxValue()
+
+            CardForm.QUEUE_TWO -> if (max.size != now.size) return false else
+                now.sort().getMaxValue() > max.sort().getMaxValue()
+
+            CardForm.BOMB -> now.getMaxValue() > max.getMaxValue()
+            CardForm.AIRCRAFT -> now.sort().getMaxValue() > max.sort().getMaxValue()
+            CardForm.AIRCRAFT_SINGLE ->
+                now.sortNum().filter { it.num != 1 }.sort().getMaxValue() > max.sortNum().filter { it.num != 1 }.sort()
+                    .getMaxValue()
+
+            CardForm.AIRCRAFT_PAIR ->
+                now.sortNum().filter { it.num != 2 }.sort().getMaxValue() > max.sortNum().filter { it.num != 2 }.sort()
+                    .getMaxValue()
+
+            CardForm.FOUR_TWO -> now.sortNum().getMaxValue() > max.sortNum().getMaxValue()
+            CardForm.FOUR_TWO_PAIR -> now.sortNum().sort().getMaxValue() > max.sortNum().sort().getMaxValue()
+            else -> false
+        }
+    }
+
+    /**
+     * 获取当前牌堆第一种牌的值
+     */
+    private fun List<Cards>.getMaxValue():Int{
+        return this.first().car.sort
+    }
 }
 
 /**
@@ -233,7 +275,7 @@ fun List<Cards>.contains(car: Car): Boolean = any { it.car == car }
 /**
  * 排序,数量多的在前
  */
-fun List<Cards>.sort(): List<Cards> = sortedByDescending { it.num }
+fun List<Cards>.sortNum(): List<Cards> = sortedByDescending { it.num }
 
 /**
  * 根据顺序判断手牌数量
