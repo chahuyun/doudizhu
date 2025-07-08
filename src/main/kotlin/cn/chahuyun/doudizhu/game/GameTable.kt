@@ -1,7 +1,10 @@
 package cn.chahuyun.doudizhu.game
 
 import cn.chahuyun.doudizhu.*
+import cn.chahuyun.doudizhu.Car.Companion.toListCards
+import cn.chahuyun.doudizhu.Cards.Companion.cardsShow
 import cn.chahuyun.doudizhu.Cards.Companion.show
+import cn.chahuyun.doudizhu.game.CardFormUtil.check
 import cn.chahuyun.doudizhu.util.MessageUtil.nextMessage
 import cn.chahuyun.doudizhu.util.PlayerUtil
 import kotlinx.coroutines.withTimeoutOrNull
@@ -235,6 +238,8 @@ class GameTable(
                     landlord = nextPlayer
                     qiang[nextPlayer] = true
                     sendMessage("${nextPlayer.name} 抢地主！")
+                } else {
+                    sendMessage("${nextPlayer.name} 不抢。")
                 }
                 timer++
                 if (timer == 3) {
@@ -276,6 +281,7 @@ class GameTable(
                             landlord = stillBidding.first { it != nextPlayer }
                             break
                         } else {
+                            sendMessage("${nextPlayer.name} 不抢。")
                             //如果不是两个人,则这个人退出角逐,下一个人的角逐必定是2个人,因为一个人在第一轮就已经确定了
                             qiang[nextPlayer] = false
                         }
@@ -297,6 +303,7 @@ class GameTable(
         """.trimIndent()
         )
 
+        game.landlord = landlord
         game.setNextPlayer(landlord)
         landlord.sendMessage("你的手牌:\n" + " ${landlord.toHand()}")
         sendMessage("${landlord.name} 抢到了地主!请开始出牌!")
@@ -307,32 +314,107 @@ class GameTable(
     /**
      * 出牌?
      */
+    @Suppress("DuplicatedCode")
     override suspend fun cards() {
         status = GameStatus.BATTLE
-        var nextPlayer :Player
+        var player = game.nextPlayer
 
-        var win= false
-        while (!win){
-            nextPlayer= game.nextPlayer
-            sendMessage(nextPlayer,"请出牌!")
+        // 比较的玩家
+        var maxPlayer: Player? = null
+        // 比较的手牌
+        var maxCards: List<Cards> = mutableListOf()
+        // 比较的牌类型
+        var maxForm: CardForm = CardForm.ERROR
+        var win: Player? = null
 
-            val nextMessage = nextPlayer.nextMessage()?: run {
-                sendMessage("${nextPlayer.name} 出牌超时,导致对局消失,大家快去骂他呀!")
+        // 提取出牌后的公共操作
+        suspend fun handlePlay(player: Player, cards: List<Cards>, match: CardForm, isFirst: Boolean) {
+            val action = if (isFirst) "出牌" else "管上"
+
+            if (player.playCards(cards)) {
+                sendMessage("${player.name} $action ${cards.cardsShow()}")
+                player.sendMessage(player.toHand())
+
+                val handSize = player.hand.size
+                if (handSize <= 2) {
+                    sendMessage("${player.name} 只剩 $handSize 张牌了!")
+                }
+
+                maxPlayer = player
+                maxForm = match
+                maxCards = cards
+            } else {
+                sendMessage("错误!")
+            }
+        }
+
+        while (true) {
+            val isFirst = maxPlayer == null || maxPlayer == player
+            sendMessage(player, "请出牌!" + if (isFirst) "" else "或者过")
+
+            val nextMessage = player.nextMessage(60) ?: run {
+                sendMessage("${player.name} 出牌超时,导致对局消失,大家快去骂他呀!")
                 cancelGame()
                 return
             }
 
             val content = nextMessage.message.contentToString()
-            if (content.matches(Regex("^[0-9AJQK大小王]{1,20}$"))) {
 
+            // 处理"过"的情况
+            if (!isFirst && content.matches(Regex("过|不要|要不起"))) {
+                sendMessage("${player.name} 要不起,过!")
+                player = game.nextPlayer
+                continue
             }
 
+            // 处理出牌的情况
+            if (content.matches(Regex("^[0-9AJQK大小王]{1,20}$"))) {
+                val listCar = parseCardInput(content)
+                if (listCar.isEmpty()) {
+                    sendMessage(player, "出牌格式错误，请按正确格式出牌！")
+                    continue
+                }
 
+                if (!player.checkHand(listCar)) {
+                    sendMessage(player, "你现在的手牌无法这样出!")
+                    continue
+                }
+
+                val cards = listCar.toListCards()
+                val match = CardFormUtil.match(cards)
+
+                if (match == CardForm.ERROR) {
+                    sendMessage(player, "你的出牌不符合规则,请重新出牌!")
+                    continue
+                }
+
+                // 检查牌型是否有效（如果是跟牌）
+                if (!isFirst && !checkEat(maxForm, match, maxCards, cards)) {
+                    sendMessage(player, "你的出牌要不起这个!")
+                    continue
+                }
+
+                // 处理出牌后的公共操作
+                handlePlay(player, cards, match, isFirst)
+
+                // 检查是否获胜
+                if (player.hand.isEmpty()) {
+                    win = player
+                    break
+                }
+
+                // 轮到下一位玩家
+                player = game.nextPlayer
+            } else {
+                sendMessage(player, "出牌格式错误，只能包含[0-9]、A、J、Q、K、大小王等字符！")
+            }
         }
 
+        win?.let {
+            sendMessage("${it.name} 获胜!")
+        } ?: sendMessage("游戏结束，但无人获胜?!")
 
-        //进入战斗!
-        TODO("Not yet implemented")
+        stop()
     }
 
     /**
@@ -340,8 +422,68 @@ class GameTable(
      * ->计算倍率，计算积分，操作结果
      */
     override suspend fun stop() {
-        TODO("Not yet implemented")
+        status = GameStatus.STOP
+        sendMessage("进入结算!")
+        players.forEach { group[it.id]?.modifyAdmin(false) }
+        group.settings.isMuteAll = false
+        cancelGame()
+        sendMessage("游戏结束!")
     }
+
+    //==游戏逻辑私有方法
+
+    /**
+     * 解析扑克牌输入字符串
+     * 支持格式：10、J、Q、K、A、大王、小王等
+     */
+    private fun parseCardInput(input: String): List<Car> {
+        val cards = mutableListOf<String>()
+        val regex = Regex("10|大王|小王|[2-9AJQK]|0")
+        var remaining = input
+
+        while (remaining.isNotEmpty()) {
+            val match = regex.find(remaining)
+                ?: // 遇到无法解析的内容
+                return emptyList()
+
+            val card = match.value
+            cards.add(
+                when (card) {
+                    "0" -> "10"  // 将0转换为10
+                    else -> card
+                }
+            )
+
+            remaining = remaining.substring(card.length)
+        }
+
+        return cards.map { Car.fromMarking(it)!! }
+    }
+
+    /**
+     * 检查吃不吃的起
+     * @return true 吃的起
+     */
+    private fun checkEat(maxForm: CardForm, nowForm: CardForm, maxCards: List<Cards>, nowCards: List<Cards>): Boolean {
+        //先判断炸弹
+        when (maxForm.value) {
+            2 -> if (nowForm.value == 1) return false
+            3 -> if (nowForm.value == 1) return false
+        }
+
+        //如果牌型相等,则分别判断
+        return if (maxForm == nowForm) {
+            maxForm.check(maxCards, nowCards)
+        } else {
+            if (nowForm.value > maxForm.value) {
+                nowForm == CardForm.BOMB || nowForm == CardForm.GHOST_BOMB
+            } else {
+                false
+            }
+        }
+    }
+
+    //==游戏过程辅助私有方法
 
     private suspend fun GameTable.sendMessage(msg: String) {
         this.group.sendMessage(msg)
@@ -367,5 +509,10 @@ class GameTable(
      * 获取好友的下一条消息
      */
     suspend fun Player.nextMessage(): MessageEvent? = nextMessage(this, 30)
+
+    /**
+     * 获取好友的下一条消息
+     */
+    suspend fun Player.nextMessage(timer: Int): MessageEvent? = nextMessage(this, timer)
 }
 
