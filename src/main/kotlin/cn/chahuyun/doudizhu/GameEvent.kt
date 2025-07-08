@@ -43,7 +43,7 @@ class GameEvent {
     @MessageAuthorize(text = ["开桌 大", "┳━┳", "来一局大的"])
     suspend fun startGameMax(event: GroupMessageEvent) = startGame(event, GameTableCoinsType.BIG)
 
-    @MessageAuthorize(text = ["整一局绝杀局"])
+    @MessageAuthorize(text = ["开桌 绝杀","整一局绝杀局","来父子局"])
     suspend fun startGameHuge(event: GroupMessageEvent) = startGame(event, GameTableCoinsType.HUGE)
 
 
@@ -110,7 +110,7 @@ class GameEvent {
 
     /**
      * 自动化领取免费狐币!
-     * @return true 大于 1000 可以游戏
+     * @return true 大于 [GameTableCoinsType.guaranteed]保底值 可以游戏
      */
     private suspend fun getFoxCoins(foxUser: FoxUser, event: GroupMessageEvent, type: GameTableCoinsType): Boolean {
         if (foxUser.coins == null) return false
