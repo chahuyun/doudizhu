@@ -58,7 +58,7 @@ class GameEvent {
                 val newPlayer = Player(messageEvent.sender.id, messageEvent.sender.nick)
                 if (!players.any { it.id == newPlayer.id }) { // 防止重复加入
                     players.add(newPlayer)
-                    group.sendMessage("${newPlayer.name} 加入了游戏！当前人数：${players.size}")
+                    group.sendMessage("${newPlayer.name} 加入了游戏！当前玩家：${players.joinToString(",") { it.name }}")
                 }
             }
         }
