@@ -247,7 +247,7 @@ class GameTable(
             if (round == 1) {
                 //第一轮
                 sendMessage(nextPlayer.id, "开始抢地主:(抢/抢地主)")
-                val nextMessage = nextMessage(nextPlayer,DZConfig.timeOut) ?: run {
+                val nextMessage = nextMessage(nextPlayer, DZConfig.timeOut) ?: run {
                     sendMessage("发送超时,(╯‵□′)╯︵┻━┻")
                     cancelGame()
                     return
@@ -283,7 +283,7 @@ class GameTable(
             if (round == 2) {
                 if (qiang[nextPlayer]!!) {
                     sendMessage(nextPlayer.id, "开始角逐抢地主:(抢/抢地主)")
-                    val nextMessage = nextMessage(nextPlayer,DZConfig.timeOut) ?: run {
+                    val nextMessage = nextMessage(nextPlayer, DZConfig.timeOut) ?: run {
                         sendMessage("发送超时,(╯‵□′)╯︵┻━┻")
                         cancelGame()
                         return
@@ -336,7 +336,7 @@ class GameTable(
         if (round == 2) {
             game.fold *= 2
             sendMessage("${landlord.name} 角逐胜者,翻倍!请开始出牌!")
-        }else{
+        } else {
             sendMessage("${landlord.name} 抢到了地主!请开始出牌!")
         }
 
@@ -478,17 +478,18 @@ class GameTable(
 
         val winName = game.winPlayer.joinToString(",") { it.name }
         val integral = game.bottom * game.fold
-        sendMessage("$winName 是赢家! 获得积分:$integral")
 
         val winPlayer = game.winPlayer
         val losePlayer = players.filter { it !in winPlayer }
 
         if (winPlayer.size == 1) {
+            sendMessage("$winName 是赢家! 获得狐币: $integral \uD83E\uDE99!")
             getFoxUser(winPlayer.first()).addVictory(integral)
             losePlayer.forEach {
                 getFoxUser(it).addLose(integral / 2)
             }
         } else {
+            sendMessage("$winName 是赢家! 分别获得狐币: ${integral / 2} \uD83E\uDE99!")
             winPlayer.forEach {
                 getFoxUser(it).addVictory(integral / 2)
             }
