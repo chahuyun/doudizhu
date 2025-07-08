@@ -201,6 +201,8 @@ class GameTable(
         game.players.forEach { it.sendMessage("你的手牌:\n ${it.toHand()}") }
 
         sendMessage("游戏开始，请移至好友查看手牌!")
+
+        dizhu()
     }
 
 
@@ -295,6 +297,7 @@ class GameTable(
         """.trimIndent()
         )
 
+        game.setNextPlayer(landlord)
         landlord.sendMessage("你的手牌:\n" + " ${landlord.toHand()}")
         sendMessage("${landlord.name} 抢到了地主!请开始出牌!")
 
@@ -306,6 +309,28 @@ class GameTable(
      */
     override suspend fun cards() {
         status = GameStatus.BATTLE
+        var nextPlayer :Player
+
+        var win= false
+        while (!win){
+            nextPlayer= game.nextPlayer
+            sendMessage(nextPlayer,"请出牌!")
+
+            val nextMessage = nextPlayer.nextMessage()?: run {
+                sendMessage("${nextPlayer.name} 出牌超时,导致对局消失,大家快去骂他呀!")
+                cancelGame()
+                return
+            }
+
+            val content = nextMessage.message.contentToString()
+            if (content.matches(Regex("^[0-9AJQK大小王]{1,20}$"))) {
+
+            }
+
+
+        }
+
+
         //进入战斗!
         TODO("Not yet implemented")
     }
