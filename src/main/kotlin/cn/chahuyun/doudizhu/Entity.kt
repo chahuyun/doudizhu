@@ -341,5 +341,6 @@ enum class GameTableCoinsType(
 ) {
     NORMAL(10, 50, 100),
     BIG(50, 200, 400),
-    HUGE(200, 1000, 2000)
+    HUGE(200, 1000, 2000),
+    PEAK(1000,3000,5000)
 }
