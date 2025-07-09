@@ -7,13 +7,16 @@ import cn.chahuyun.doudizhu.DouDiZhu.debug
 import cn.chahuyun.doudizhu.FoxUserManager.getFoxUser
 import cn.chahuyun.doudizhu.data.FoxUser
 import cn.chahuyun.doudizhu.game.GameTable
+import cn.chahuyun.doudizhu.util.CustomForwardDisplayStrategy
 import cn.chahuyun.doudizhu.util.MessageUtil.nextGroupMessage
+import cn.chahuyun.hibernateplus.HibernateFactory
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.events.GroupMessageEvent
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.PlainText
+import net.mamoe.mirai.message.data.buildForwardMessage
 
 /**
  * 游戏事件
@@ -43,11 +46,99 @@ class GameEvent {
     @MessageAuthorize(text = ["开桌 大", "┳━┳", "来一局大的"])
     suspend fun startGameMax(event: GroupMessageEvent) = startGame(event, GameTableCoinsType.BIG)
 
-    @MessageAuthorize(text = ["开桌 绝杀","整一局绝杀局","来父子局"])
+    @MessageAuthorize(text = ["开桌 绝杀", "整一局绝杀局", "来父子局"])
     suspend fun startGameHuge(event: GroupMessageEvent) = startGame(event, GameTableCoinsType.HUGE)
 
+    @MessageAuthorize(text = ["我的狐币", "狐币"])
+    suspend fun viewFoxCoins(event: GroupMessageEvent) {
+        val foxUser = getFoxUser(event.sender)
+        event.sendMessageQuery("当前狐币：${foxUser.coins}!")
+    }
 
-    suspend fun startGame(event: GroupMessageEvent, type: GameTableCoinsType) {
+    @MessageAuthorize(text = ["胜率榜"])
+    suspend fun viewVictory(event: GroupMessageEvent) {
+        val list = HibernateFactory.selectListByHql(
+            FoxUser::class.java,
+            "FROM FoxUser ORDER BY (victory / (victory + lose + 0.0)) DESC limit 10",
+            mutableMapOf()
+        ).filter { (it.victory ?: 0) + (it.lose ?: 0) >= 5 }
+        val bot = event.bot
+        val sender = event.sender
+
+        var no = 1
+        val message = event.buildForwardMessage(
+            displayStrategy =
+            CustomForwardDisplayStrategy(
+                titleGenerator = "群聊的聊天记录",
+                previewGenerator = listOf(
+                    "${DZConfig.botName}:分享一个炸裂的瓜!",
+                    "${sender.nameCardOrNick}:卧槽,这是真的吗?",
+                    "${DZConfig.botName}:[图片]"
+                ),
+                summarySize = 10
+            )
+        ) {
+            bot named DZConfig.botName says "以下是胜率排行榜↓:"
+            list.forEach {
+                sender says """
+                    No.${no++}
+                    用户名:${it.name}
+                    狐币:${it.coins}
+                    胜率:${it.winRate()}%
+                    总场次:${it.victory!! + it.lose!!}
+                """.trimIndent()
+            }
+        }
+
+        event.subject.sendMessage(message)
+    }
+
+
+    @MessageAuthorize(text = ["狐币榜"])
+    suspend fun viewCoins(event: GroupMessageEvent) {
+        val list = HibernateFactory.selectListByHql(
+            FoxUser::class.java,
+            "FROM FoxUser ORDER BY coins DESC limit 10",
+            mutableMapOf()
+        ).filter { (it.victory ?: 0) + (it.lose ?: 0) >= 5 }
+        val bot = event.bot
+        val sender = event.sender
+
+        var no = 1
+        val message = event.buildForwardMessage(
+            displayStrategy =
+            CustomForwardDisplayStrategy(
+                titleGenerator = "群聊的聊天记录",
+                previewGenerator = listOf(
+                    "${sender.nameCardOrNick}:给兄弟们来点豪堪的!",
+                    "${sender.nameCardOrNick}:[图片]",
+                    "${sender.nameCardOrNick}:[图片]",
+                ),
+                summarySize = 10
+            )
+        ) {
+            bot named DZConfig.botName says "以下是狐币排行榜↓:"
+            list.forEach {
+                sender says """
+                    No.${no++}
+                    用户名:${it.name}
+                    狐币:${it.coins}
+                    胜率:${it.winRate()}%
+                    总场次:${it.victory!! + it.lose!!}
+                """.trimIndent()
+            }
+        }
+
+        event.subject.sendMessage(message)
+    }
+
+
+    //=辅助私有方法
+
+    /**
+     * 开始游戏
+     */
+    private suspend fun startGame(event: GroupMessageEvent, type: GameTableCoinsType) {
         val sender = event.sender
         val group = event.group
 
@@ -87,7 +178,7 @@ class GameEvent {
                 val playerFoxUser = getFoxUser(newPlayer)
 
                 if (playerFoxUser.coins!! < type.guaranteed) {
-                    if (!getFoxCoins(foxUser, event, type)) continue
+                    if (!getFoxCoins(playerFoxUser, messageEvent, type)) continue
                 }
                 if (!players.any { it.id == newPlayer.id }) { // 防止重复加入
                     players.add(newPlayer)
@@ -101,13 +192,6 @@ class GameEvent {
         gameTable.start()
     }
 
-
-    @MessageAuthorize(text = ["我的狐币", "狐币"])
-    suspend fun viewFoxCoins(event: GroupMessageEvent) {
-        val foxUser = getFoxUser(event.sender)
-        event.sendMessageQuery("当前狐币：${foxUser.coins}\uD83E\uDE99!")
-    }
-
     /**
      * 自动化领取免费狐币!
      * @return true 大于 [GameTableCoinsType.guaranteed]保底值 可以游戏
@@ -118,7 +202,7 @@ class GameEvent {
         while (foxUser.coins!! < type.guaranteed) {
             val coins = FoxCoinsManager.receiveGoldCoins(foxUser)
             if (coins.first) {
-                reply = reply.plus(PlainText("今日第${coins.second}次,当前狐币：${foxUser.coins}\uD83E\uDE99!\n"))
+                reply = reply.plus(PlainText("今日第${coins.second}次,当前狐币：${foxUser.coins}!\n"))
             } else {
                 reply = reply.plus(PlainText("免费次数已用完,你的狐币仍然不够 ${type.guaranteed} !"))
                 event.subject.sendMessage(reply)
