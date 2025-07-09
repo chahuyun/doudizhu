@@ -49,6 +49,9 @@ class GameEvent {
     @MessageAuthorize(text = ["开桌 绝杀", "整一局绝杀局", "来父子局"])
     suspend fun startGameHuge(event: GroupMessageEvent) = startGame(event, GameTableCoinsType.HUGE)
 
+    @MessageAuthorize(text = ["开桌 巅峰", "来巅峰局","来癫疯局"])
+    suspend fun startGamePeak(event: GroupMessageEvent) = startGame(event, GameTableCoinsType.PEAK)
+
     @MessageAuthorize(text = ["我的狐币", "狐币"])
     suspend fun viewFoxCoins(event: GroupMessageEvent) {
         val foxUser = getFoxUser(event.sender)
@@ -80,7 +83,7 @@ class GameEvent {
         ) {
             bot named DZConfig.botName says "以下是胜率排行榜↓:"
             list.forEach {
-                sender says """
+                it.uid!! says """
                     No.${no++}
                     用户名:${it.name}
                     狐币:${it.coins}
@@ -119,7 +122,7 @@ class GameEvent {
         ) {
             bot named DZConfig.botName says "以下是狐币排行榜↓:"
             list.forEach {
-                sender says """
+                it.uid!! says """
                     No.${no++}
                     用户名:${it.name}
                     狐币:${it.coins}
@@ -158,10 +161,11 @@ class GameEvent {
         val action = when (type) {
             GameTableCoinsType.NORMAL -> "普通"
             GameTableCoinsType.BIG -> "豪华"
-            else -> "绝杀"
+            GameTableCoinsType.HUGE -> "绝杀"
+            else -> "巅峰"
         }
 
-        group.sendMessage("${sender.nick} 开启了一桌 $action 对局游戏，快快发送 加入对局 加入对局进行游戏吧!")
+        group.sendMessage("${sender.nick} 开启了一桌 $action 对局游戏，快快发送 加入对局|来 加入对局进行游戏吧!")
 
         // 使用可变列表来添加玩家
         val players = mutableListOf(Player(sender.id, sender.nameCardOrNick))
@@ -173,7 +177,8 @@ class GameEvent {
                 return // 如果超时则退出
             }
 
-            if (messageEvent.message.contentToString().matches("^加入|来".toRegex())) { // 检查消息内容是否为加入请求
+            val content = messageEvent.message.contentToString()
+            if (content.matches("^加入|来".toRegex())) { // 检查消息内容是否为加入请求
                 val newPlayer = Player(messageEvent.sender.id, messageEvent.sender.nick)
                 val playerFoxUser = getFoxUser(newPlayer)
 
@@ -184,6 +189,8 @@ class GameEvent {
                     players.add(newPlayer)
                     group.sendMessage("${newPlayer.name} 加入了游戏！当前玩家：${players.joinToString(",") { it.name }}")
                 }
+            }else if (content.matches("^掀桌".toRegex())) {
+                group.sendMessage("掀桌(╯‵□′)╯︵┻━┻")
             }
         }
 
