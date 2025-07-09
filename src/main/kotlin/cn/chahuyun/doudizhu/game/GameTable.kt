@@ -169,7 +169,7 @@ class GameTable(
 
             val input = nextMessage.message.contentToString().trim()
 
-            if (input == "掀桌") {
+            if (input.startsWith("掀桌")) {
                 sendMessage("${player.name} 掀桌(╯‵□′)╯︵┻━┻")
                 cancelGame()
                 return
@@ -254,7 +254,7 @@ class GameTable(
                 }
 
                 val content = nextMessage.message.contentToString()
-                if (content.matches(Regex("^抢|抢地主"))) {
+                if (content.matches(Regex("^q|抢|抢地主"))) {
                     landlord = nextPlayer
                     qiang[nextPlayer] = true
                     sendMessage("${nextPlayer.name} 抢地主！")
@@ -291,7 +291,7 @@ class GameTable(
 
                     val content = nextMessage.message.contentToString()
 
-                    if (content.matches(Regex("^抢|抢地主"))) {
+                    if (content.matches(Regex("^q|抢|抢地主"))) {
                         landlord = nextPlayer
                         break
                     } else {
@@ -403,7 +403,7 @@ class GameTable(
             val content = nextMessage.message.contentToString()
 
             // 处理"过"的情况
-            if (!isFirst && content.matches(Regex("过|不要|要不起"))) {
+            if (!isFirst && content.matches(Regex("\\.{2,4}|go?|过|不要|要不起"))) {
                 player = game.nextPlayer
                 continue
             }
