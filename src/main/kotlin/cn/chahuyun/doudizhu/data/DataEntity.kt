@@ -55,7 +55,12 @@ data class FoxUser(
         foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT)
     )
     var foxGame: FoxGameAuxiliary? = null,
-)
+){
+    /**
+     * 获取胜率
+     */
+    fun winRate():Int = (victory!!/((victory!!+lose!!)))
+}
 
 /**
  * 玩家辅主工具
