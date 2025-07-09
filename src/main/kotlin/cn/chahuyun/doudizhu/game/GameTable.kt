@@ -249,7 +249,7 @@ class GameTable(
                 sendMessage(nextPlayer.id, "开始抢地主:(抢/抢地主)")
                 val nextMessage = nextMessage(nextPlayer, DZConfig.timeOut) ?: run {
                     sendMessage("发送超时,(╯‵□′)╯︵┻━┻")
-                    cancelGame()
+                    stopGame()
                     return
                 }
 
@@ -285,7 +285,7 @@ class GameTable(
                     sendMessage(nextPlayer.id, "开始角逐抢地主:(抢/抢地主)")
                     val nextMessage = nextMessage(nextPlayer, DZConfig.timeOut) ?: run {
                         sendMessage("发送超时,(╯‵□′)╯︵┻━┻")
-                        cancelGame()
+                        stopGame()
                         return
                     }
 
@@ -357,7 +357,7 @@ class GameTable(
         var maxCards: List<Cards> = mutableListOf()
         // 比较的牌类型
         var maxForm: CardForm = CardForm.ERROR
-        var win: Player
+        val win: Player
 
         // 提取出牌后的公共操作
         suspend fun handlePlay(player: Player, cards: List<Cards>, match: CardForm, isFirst: Boolean) {
@@ -396,7 +396,7 @@ class GameTable(
 
             val nextMessage = player.nextMessage(DZConfig.timeOut) ?: run {
                 sendMessage("${player.name} 出牌超时,导致对局消失,大家快去骂他呀!")
-                cancelGame()
+                stopGame()
                 return
             }
 
@@ -483,22 +483,21 @@ class GameTable(
         val losePlayer = players.filter { it !in winPlayer }
 
         if (winPlayer.size == 1) {
-            sendMessage("$winName 是赢家! 获得狐币: $integral \uD83E\uDE99!")
+            sendMessage("$winName 是赢家! 获得狐币: $integral !")
             getFoxUser(winPlayer.first()).addVictory(integral)
             losePlayer.forEach {
                 getFoxUser(it).addLose(integral / 2)
             }
         } else {
-            sendMessage("$winName 是赢家! 分别获得狐币: ${integral / 2} \uD83E\uDE99!")
+            sendMessage("$winName 是赢家! 分别获得狐币: ${integral / 2} !")
             winPlayer.forEach {
                 getFoxUser(it).addVictory(integral / 2)
             }
             getFoxUser(losePlayer.first()).addLose(integral)
         }
 
-        players.forEach { group[it.id]?.modifyAdmin(false) }
-        group.settings.isMuteAll = false
-        cancelGame()
+
+        stopGame()
         sendMessage("游戏结束!")
     }
 
@@ -582,6 +581,12 @@ class GameTable(
 
     private fun GameTable.cancelGame() {
         GameEvent.cancelGame(group)
+    }
+
+    private suspend fun GameTable.stopGame() {
+        players.forEach { group[it.id]?.modifyAdmin(false) }
+        group.settings.isMuteAll = false
+        cancelGame()
     }
 
     /**
