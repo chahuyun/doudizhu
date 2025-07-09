@@ -83,7 +83,7 @@ class GameEvent {
         ) {
             bot named DZConfig.botName says "以下是胜率排行榜↓:"
             list.forEach {
-                it.uid!! says """
+                it.uid!! named it.name!! says """
                     No.${no++}
                     用户名:${it.name}
                     狐币:${it.coins}
@@ -122,7 +122,7 @@ class GameEvent {
         ) {
             bot named DZConfig.botName says "以下是狐币排行榜↓:"
             list.forEach {
-                it.uid!! says """
+                it.uid!! named it.name!! says """
                     No.${no++}
                     用户名:${it.name}
                     狐币:${it.coins}
