@@ -14,7 +14,7 @@ import net.mamoe.mirai.message.data.RawForwardMessage
 class CustomForwardDisplayStrategy(
     private val titleGenerator:  String =  "群聊的聊天记录" ,
     private val briefGenerator:  String =  "[聊天记录]" ,
-    private val previewGenerator:  List<String> = mutableListOf("1:1","2:2"),
+    private val previewGenerator:  List<String> = mutableListOf("放空:1","放空:2"),
     private val summarySize: Int = 10,
     private val summaryGenerator:String = "查看${summarySize}条转发消息",
     private val sourceGenerator:   String =  "聊天记录" ,
