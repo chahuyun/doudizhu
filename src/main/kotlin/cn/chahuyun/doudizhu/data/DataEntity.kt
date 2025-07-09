@@ -55,11 +55,16 @@ data class FoxUser(
         foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT)
     )
     var foxGame: FoxGameAuxiliary? = null,
-){
+) {
     /**
-     * 获取胜率
+     * 获取胜率，保留一位小数（例如：66.7）
      */
-    fun winRate():Int = (victory!!/((victory!!+lose!!)))
+    fun winRate(): Double {
+        val total = (victory ?: 0) + (lose ?: 0)
+        if (total == 0) return 0.0
+        val rate = (victory ?: 0).toDouble() / total.toDouble() * 100
+        return String.format("%.1f", rate).toDouble()
+    }
 }
 
 /**
