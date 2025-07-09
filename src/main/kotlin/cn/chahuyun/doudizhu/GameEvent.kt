@@ -191,6 +191,7 @@ class GameEvent {
                 }
             }else if (content.matches("^掀桌".toRegex())) {
                 group.sendMessage("掀桌(╯‵□′)╯︵┻━┻")
+                gameTables.remove(group.id)
             }
         }
 
