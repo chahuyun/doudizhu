@@ -29,7 +29,7 @@ object MessageUtil {
      * @param group 要监听的群组对象
      * @return 收到的消息事件（[MessageEvent]），如果没有收到则挂起直到有消息
      */
-    suspend fun nextGroupMessage(group: Group): MessageEvent? {
+    suspend fun nextGroupMessage(group: Group): GroupMessageEvent? {
         return nextGroupMessage(group.id)
     }
 
@@ -40,7 +40,7 @@ object MessageUtil {
      * @param timer 超时时间（单位：秒）
      * @return 如果在规定时间内收到消息则返回 [MessageEvent]，否则返回 null
      */
-    suspend fun nextGroupMessage(group: Group, timer: Int): MessageEvent? = withTimeoutOrNull(timer * 1000L) {
+    suspend fun nextGroupMessage(group: Group, timer: Int): GroupMessageEvent? = withTimeoutOrNull(timer * 1000L) {
         nextGroupMessage(group.id)
     }
 
@@ -50,7 +50,7 @@ object MessageUtil {
      * @param groupId 要监听的群组 ID
      * @return 收到的消息事件（[MessageEvent]），如果没有收到则挂起直到有消息
      */
-    suspend fun nextGroupMessage(groupId: Long): MessageEvent? = callbackFlow {
+    suspend fun nextGroupMessage(groupId: Long): GroupMessageEvent? = callbackFlow {
         val once = DouDiZhu.channel.filter { it.subject.id == groupId }
             .subscribeOnce<GroupMessageEvent> { trySend(it) }
         // 当 callbackFlow 结束时取消监听器
