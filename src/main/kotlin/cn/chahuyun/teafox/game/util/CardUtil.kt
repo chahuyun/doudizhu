@@ -2,7 +2,7 @@ package cn.chahuyun.teafox.game.util
 
 import cn.chahuyun.teafox.game.Car
 import cn.chahuyun.teafox.game.Car.*
-import cn.chahuyun.teafox.game.Cards
+import cn.chahuyun.teafox.game.CardRanks
 
 /**
  * 游戏牌工具
@@ -23,7 +23,7 @@ object CardUtil {
      * 打印牌
      */
     @JvmName("showCars")
-    fun List<Cards>.show(): String {
+    fun List<CardRanks>.show(): String {
         return sort().flatMap { cards -> List(cards.num) { "${cards.car}" } }.joinToString()
     }
 
@@ -31,7 +31,7 @@ object CardUtil {
      * 反方向打印牌
      */
     @JvmName("cardsShow")
-    fun List<Cards>.cardsShow(): String {
+    fun List<CardRanks>.cardsShow(): String {
         return sort().reversed().flatMap { cards -> List(cards.num) { "${cards.car}" } }.joinToString()
     }
 
@@ -41,7 +41,7 @@ object CardUtil {
      * 将List<Cards>转换为List<Car>
      */
     @JvmName("toListCar")
-    fun List<Cards>.toListCar(): List<Car> {
+    fun List<CardRanks>.toListCar(): List<Car> {
         return flatMap { cards -> List(cards.num) { cards.car } }
     }
 
@@ -49,10 +49,10 @@ object CardUtil {
      * 将List<Car>转换为List<Cards>
      */
     @JvmName("toListCards")
-    fun List<Car>.toListCards(): List<Cards> {
+    fun List<Car>.toListCards(): List<CardRanks> {
         return this.groupingBy { it }
             .eachCount()
-            .map { (car, count) -> Cards(car, count) }
+            .map { (car, count) -> CardRanks(car, count) }
     }
 
     // == 排序 ==
@@ -69,21 +69,21 @@ object CardUtil {
      * 按照斗地主的牌的大小进行排序
      */
     @JvmName("sortCards")
-    fun List<Cards>.sort(): List<Cards> {
+    fun List<CardRanks>.sort(): List<CardRanks> {
         return sortedByDescending { it.car.sort }
     }
 
     /**
      * 排序,数量多的在前
      */
-    fun List<Cards>.sortNum(): List<Cards> = sortedByDescending { it.num }
+    fun List<CardRanks>.sortNum(): List<CardRanks> = sortedByDescending { it.num }
 
     // == 其他工具 ==
 
     /**
      * 匹配牌
      */
-    fun List<Cards>.contains(car: Car): Boolean = any { it.car == car }
+    fun List<CardRanks>.contains(car: Car): Boolean = any { it.car == car }
 
 
     /**
@@ -91,7 +91,7 @@ object CardUtil {
      * 排除2大小王
      */
     @JvmName("continuousCards")
-    fun continuous(cars: List<Cards>): Boolean {
+    fun continuous(cars: List<CardRanks>): Boolean {
         return continuous(cars.map { it.car })
     }
 

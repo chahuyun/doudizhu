@@ -1,9 +1,8 @@
 package cn.chahuyun.teafox.game.game
 
 import cn.chahuyun.teafox.game.Car
-import cn.chahuyun.teafox.game.Cards
+import cn.chahuyun.teafox.game.CardRanks
 import cn.chahuyun.teafox.game.util.CardUtil.sortNum
-import cn.chahuyun.teafox.game.util.CardUtil.contains
 import cn.chahuyun.teafox.game.util.CardUtil.continuous
 import cn.chahuyun.teafox.game.util.CardUtil.sort
 
@@ -93,7 +92,7 @@ object CardFormUtil {
      * 穷举类型，利用牌数量和牌型数量2维定位，快速匹配牌型
      * 穷尽了！
      */
-    fun match(cards: List<Cards>): CardForm {
+    fun match(cards: List<CardRanks>): CardForm {
         //排序
         val sort = cards.sortNum()
         //总牌数量
@@ -377,7 +376,7 @@ object CardFormUtil {
      * 检查能不能吃的起
      * @return true 吃得起
      */
-    fun CardForm.check(max: List<Cards>, now: List<Cards>): Boolean {
+    fun CardForm.check(max: List<CardRanks>, now: List<CardRanks>): Boolean {
         return when (this) {
             CardForm.SINGLE -> now.getMaxValue() > max.getMaxValue()
             CardForm.PAIR -> now.getMaxValue() > max.getMaxValue()
@@ -410,14 +409,14 @@ object CardFormUtil {
     /**
      * 获取当前牌堆第一种牌的值
      */
-    private fun List<Cards>.getMaxValue(): Int {
+    private fun List<CardRanks>.getMaxValue(): Int {
         return this.first().car.sort
     }
 
     /**
      * 根据顺序判断手牌数量
      */
-    private fun List<Cards>.inspection(vararg nums: Int): Boolean =
+    private fun List<CardRanks>.inspection(vararg nums: Int): Boolean =
         size == nums.size && indices.all { this[it].num == nums[it] }
 }
 
