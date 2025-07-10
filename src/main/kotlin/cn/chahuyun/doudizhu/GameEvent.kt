@@ -173,7 +173,8 @@ class GameEvent {
         debug("等待加入游戏!")
         while (players.size < 3) {
             val messageEvent = nextGroupMessage(group, DZConfig.timeOut) ?: run {
-                group.sendMessage("等待玩家加入超时，游戏未能开始。")
+                group.sendMessage("等待玩家加入超时，游戏未能开始(╯‵□′)╯︵┻━┻")
+                gameTables.remove(group.id)
                 return // 如果超时则退出
             }
 
