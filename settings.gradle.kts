@@ -1,5 +1,5 @@
 plugins {
 
 }
-rootProject.name = "doudizhu"
+rootProject.name = "TeaFoxGames"
 
