@@ -54,15 +54,17 @@ class DizhuGameTable(
      * 默认对局类型
      */
     private val type: GameTableCoinsType = GameTableCoinsType.NORMAL,
-    ) : GameTable {
+) : GameTable {
     /**
      * 游戏类型默认为 斗地主
      */
     override val gameType: GameType = GameType.DIZHU
+
     /**
      * 对局信息
      */
     private lateinit var game: Game
+
     /**
      * 底牌，先用空代替
      */
@@ -465,17 +467,22 @@ class DizhuGameTable(
         val winPlayer = game.winPlayer
         val losePlayer = players.filter { it !in winPlayer }
 
+        val resutl = integral / 2
+        val surplus = integral % 2
+
         if (winPlayer.size == 1) {
             sendMessage("$winName 是赢家! 获得狐币: $integral !")
             FoxUserManager.getFoxUser(winPlayer.first()).addVictory(integral)
-            losePlayer.forEach {
-                FoxUserManager.getFoxUser(it).addLose(integral / 2)
-            }
+            require(losePlayer.size == 2)
+            val (p1, p2) = losePlayer
+            FoxUserManager.getFoxUser(p1).addLose(resutl + surplus)
+            FoxUserManager.getFoxUser(p2).addLose(resutl)
         } else {
-            sendMessage("$winName 是赢家! 分别获得狐币: ${integral / 2} !")
-            winPlayer.forEach {
-                FoxUserManager.getFoxUser(it).addVictory(integral / 2)
-            }
+            sendMessage("$winName 是赢家! 分别获得狐币: $resutl !")
+            require(winPlayer.size == 2)
+            val (p1, p2) = winPlayer
+            FoxUserManager.getFoxUser(p1).addVictory(resutl + surplus)
+            FoxUserManager.getFoxUser(p2).addVictory(resutl)
             FoxUserManager.getFoxUser(losePlayer.first()).addLose(integral)
         }
 
