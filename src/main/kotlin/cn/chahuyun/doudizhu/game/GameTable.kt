@@ -15,9 +15,9 @@ enum class GameStatus {
     START,
 
     /**
-     * 抢地主
+     * 初始化
      */
-    DIZHU,
+    INITIAL,
 
     /**
      * 战斗中
@@ -54,13 +54,15 @@ interface GameTable {
     suspend fun start()
 
     /**
+     * ->游戏初期阶段
      * ->抢地主阶段
      * ->决定地主，补牌
      */
-    suspend fun dizhu()
+    suspend fun initial()
 
     /**
-     * 出牌?
+     * ->游戏对局阶段
+     * ->出牌
      */
     suspend fun cards()
 
