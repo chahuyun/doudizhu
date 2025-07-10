@@ -6,6 +6,7 @@ import cn.chahuyun.authorize.utils.MessageUtil.sendMessageQuery
 import cn.chahuyun.doudizhu.DouDiZhu.debug
 import cn.chahuyun.doudizhu.FoxUserManager.getFoxUser
 import cn.chahuyun.doudizhu.data.FoxUser
+import cn.chahuyun.doudizhu.game.DizhuGameTable
 import cn.chahuyun.doudizhu.game.GameTable
 import cn.chahuyun.doudizhu.util.CustomForwardDisplayStrategy
 import cn.chahuyun.doudizhu.util.MessageUtil.nextGroupMessage
@@ -155,7 +156,7 @@ class GameEvent {
             group.sendMessage("游戏桌 ┳━┳ 已存在，请勿重复创建")
             return
         } else {
-            gameTables[group.id] = GameTable(listOf(), event.bot, group)
+            gameTables[group.id] = DizhuGameTable(group, listOf(), event.bot)
         }
 
         val action = when (type) {
@@ -198,7 +199,7 @@ class GameEvent {
             }
         }
 
-        val gameTable = GameTable(players, event.bot, group, type = type)
+        val gameTable = DizhuGameTable(group, players, event.bot, type = type)
         gameTables[group.id] = gameTable
         gameTable.start()
     }

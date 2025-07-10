@@ -344,3 +344,13 @@ enum class GameTableCoinsType(
     HUGE(200, 1000, 2000),
     PEAK(1000,3000,5000)
 }
+
+/**
+ * 游戏类型
+ */
+enum class GameType{
+    /**
+     * 斗地主
+     */
+    DIZHU
+}

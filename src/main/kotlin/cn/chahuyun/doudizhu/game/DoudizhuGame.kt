@@ -1,0 +1,616 @@
+package cn.chahuyun.doudizhu.game
+
+import cn.chahuyun.doudizhu.*
+import cn.chahuyun.doudizhu.Car.Companion.toListCards
+import cn.chahuyun.doudizhu.Cards.Companion.cardsShow
+import cn.chahuyun.doudizhu.Cards.Companion.show
+import cn.chahuyun.doudizhu.FoxUserManager.addLose
+import cn.chahuyun.doudizhu.FoxUserManager.addVictory
+import cn.chahuyun.doudizhu.game.CardFormUtil.check
+import cn.chahuyun.doudizhu.util.MessageUtil
+import cn.chahuyun.doudizhu.util.PlayerUtil
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
+import net.mamoe.mirai.Bot
+import net.mamoe.mirai.contact.Group
+import net.mamoe.mirai.contact.MemberPermission
+import net.mamoe.mirai.event.events.MessageEvent
+import net.mamoe.mirai.message.data.At
+import net.mamoe.mirai.message.data.MessageChain
+import net.mamoe.mirai.message.data.PlainText
+import net.mamoe.mirai.message.data.buildMessageChain
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.floor
+import kotlin.math.roundToInt
+
+/**
+ * 游戏桌
+ */
+@Suppress("SpellCheckingInspection")
+class DizhuGameTable(
+    /**
+     * 群
+     */
+    override val group: Group,
+    /**
+     * 玩家
+     */
+    override val players: List<Player>,
+    /**
+     * bot
+     */
+    private val bot: Bot,
+    /**
+     * 游戏状态
+     */
+    private var status: GameStatus = GameStatus.START,
+    /**
+     * 牌库
+     */
+    private val deck: List<Car> = Cards.createFullExpandDeck(),
+    /**
+     * 默认对局类型
+     */
+    private val type: GameTableCoinsType = GameTableCoinsType.NORMAL,
+    ) : GameTable {
+    /**
+     * 游戏类型默认为 斗地主
+     */
+    override val gameType: GameType = GameType.DIZHU
+    /**
+     * 对局信息
+     */
+    private lateinit var game: Game
+    /**
+     * 底牌，先用空代替
+     */
+    private lateinit var bottomCards: List<Car>
+
+    /**
+     * 掀桌异常
+     */
+    private inner class TableFlipException(val player: Player) : RuntimeException()
+    private inner class VotingTimeoutException : RuntimeException()
+
+    /**
+     * ->游戏开始
+     * ->检查好友，开启禁言，发牌
+     * ->进入轮询消息监听，开始对局
+     */
+    override suspend fun start() {
+        if (group.botPermission != MemberPermission.OWNER) {
+            sendMessage("本${DZConfig.botName}不是群主哦~")
+            cancelGame()
+            return
+        }
+
+        sendMessage("游戏开始,请在2分钟内添加本bot的好友!")
+
+        withTimeoutOrNull(120 * 1000L) {
+            val util = PlayerUtil(players)
+            if (util.check()) return@withTimeoutOrNull
+            if (util.listening()) return@withTimeoutOrNull
+        } ?: run {
+            players.forEach {
+                if (bot.getFriend(it.id) == null) {
+                    sendMessage("${it.name} 还不是本${DZConfig.botName}的好友哦!")
+                    cancelGame()
+                    return
+                }
+            }
+        }
+
+        val votes = ConcurrentHashMap<Long, Int>() // 线程安全的Map
+
+        try {
+            coroutineScope {
+                sendMessage(buildMessageChain {
+                    players.forEach { player ->
+                        +At(player.id)
+                    }
+                    +"请同时投票底分(${type.min}~${type.max})，发送「掀桌」停止配置"
+                })
+
+                // 为每个玩家启动异步任务
+                players.map { player ->
+                    async {
+                        try {
+                            val nextMessage = MessageUtil.nextMessage(player, DZConfig.timeOut)
+                                ?: throw VotingTimeoutException()
+
+                            val input = nextMessage.message.contentToString().trim()
+
+                            if (input.startsWith("掀桌")) {
+                                throw TableFlipException(player)
+                            }
+
+                            val bet = input.toIntOrNull()
+                            if (bet != null && bet in type.min..type.max) {
+                                votes[player.id] = bet
+                                sendMessage("${player.name} 配置底分为: $bet!")
+                            } else {
+                                sendMessage("${player.name} 输入无效，底分范围为 ${type.min}~${type.max}，已使用默认值 ${type.min}。")
+                                votes[player.id] = type.min
+                            }
+                        } catch (e: Exception) {
+                            when (e) {
+                                is TableFlipException, is VotingTimeoutException -> throw e
+                                else -> {
+                                    // 其他异常使用默认值
+                                    votes[player.id] = type.min
+                                }
+                            }
+                        }
+                    }
+                }.awaitAll()
+            }
+        } catch (e: TableFlipException) {
+            sendMessage("${e.player.name} 掀桌(╯‵□′)╯︵┻━┻")
+            cancelGame()
+            return
+        } catch (e: VotingTimeoutException) {
+            sendMessage("配置超时,(╯‵□′)╯︵┻━┻")
+            cancelGame()
+            return
+        } catch (e: Exception) {
+            sendMessage("配置过程中发生错误，游戏取消")
+            cancelGame()
+            return
+        }
+
+        // 计算平均值
+        val total = votes.values.sum()
+        // 平均值
+        val average = total / votes.size.toDouble()
+        // 向下取整
+        val finalBet = floor(average).roundToInt()
+
+        sendMessage("三人输入底分分别为：${votes.values.joinToString(",")}，最终底分为：$finalBet")
+
+        game = Game(players, group.id, finalBet, 1)
+
+        // 分配底牌
+        bottomCards = deck.take(3)
+        // 剩余的牌分配给玩家
+        val playerCards = deck.drop(3)
+
+        // 发牌逻辑 - 每人17张牌
+        var nextPlayerIndex = 0
+        for (card in playerCards) {
+            game.addHand(nextPlayerIndex, card)
+            nextPlayerIndex = (nextPlayerIndex + 1) % game.players.size
+        }
+
+        game.players.forEach {
+            group[it.id]?.modifyAdmin(true) ?: run {
+                sendMessage("有一位牌友不在群里，游戏失败")
+                try {
+                    game.players.forEach { at -> group[at.id]?.modifyAdmin(false) }
+                } catch (_: Exception) {
+                }
+                return
+            }
+        }
+
+        group.settings.isMuteAll = true
+
+        game.players.forEach { it.sendMessage("你的手牌:\n ${it.toHand()}") }
+
+        sendMessage("游戏开始，请移至好友查看手牌!")
+
+        dizhu()
+    }
+
+    /**
+     * ->抢地主阶段
+     * ->决定地主，补牌
+     */
+    override suspend fun dizhu() {
+        status = GameStatus.DIZHU
+        var nextPlayer: Player
+
+        var landlord: Player? = null
+        // 记录每位玩家是否曾经抢过地主
+        val qiang = players.associateWith { false }.toMutableMap()
+        var round = 1
+        var timer = 0
+        while (true) {
+            nextPlayer = players[timer % 3]
+            if (round == 1) {
+                //第一轮
+                sendMessage(nextPlayer.id, "开始抢地主:(抢/抢地主)")
+                val nextMessage = MessageUtil.nextMessage(nextPlayer, DZConfig.timeOut) ?: run {
+                    sendMessage("发送超时,(╯‵□′)╯︵┻━┻")
+                    stopGame()
+                    return
+                }
+
+                val content = nextMessage.message.contentToString()
+                if (content.matches(Regex("^q|抢|抢地主"))) {
+                    landlord = nextPlayer
+                    qiang[nextPlayer] = true
+                    sendMessage("${nextPlayer.name} 抢地主！")
+                } else {
+                    sendMessage("${nextPlayer.name} 不抢。")
+                }
+                timer++
+                if (timer == 3) {
+                    //三人操作完成,验证后进行第二轮
+                    val stillBidding = qiang.filterValues { it }.keys.toList()
+                    if (stillBidding.size == 1) {
+                        break
+                    } else if (stillBidding.isEmpty()) {
+                        // TODO: 可以后期再决定是否重新发牌/重置游戏
+                        landlord = players.random()
+                        sendMessage("无人角逐地主,那本${DZConfig.botName}就随便指定一个了!恭喜${landlord.name}成功地主!")
+                        break
+                    } else {
+                        round = 2
+                        continue
+                    }
+                }
+            }
+
+            //第二轮
+            if (round == 2) {
+                if (qiang[nextPlayer]!!) {
+                    sendMessage(nextPlayer.id, "开始角逐抢地主:(抢/抢地主)")
+                    val nextMessage = MessageUtil.nextMessage(nextPlayer, DZConfig.timeOut) ?: run {
+                        sendMessage("发送超时,(╯‵□′)╯︵┻━┻")
+                        stopGame()
+                        return
+                    }
+
+                    val content = nextMessage.message.contentToString()
+
+                    if (content.matches(Regex("^q|抢|抢地主"))) {
+                        landlord = nextPlayer
+                        break
+                    } else {
+                        val stillBidding = qiang.filterValues { it }.keys.toList()
+                        if (stillBidding.size == 2) {
+                            //如果是两个人的角逐,排除当前人,直接让另外一个人上位
+                            landlord = stillBidding.first { it != nextPlayer }
+                            break
+                        } else {
+                            sendMessage("${nextPlayer.name} 不抢。")
+                            //如果不是两个人,则这个人退出角逐,下一个人的角逐必定是2个人,因为一个人在第一轮就已经确定了
+                            qiang[nextPlayer] = false
+                        }
+                    }
+                }
+                timer++
+            }
+        }
+
+        if (landlord == null) {
+            sendMessage("系统错误!")
+            return
+        }
+
+        bottomCards.forEach { landlord.addHand(it) }
+
+        if (bottomCards.toListCards().size == 1) {
+            sendMessage("底牌是3连:${bottomCards.show()},翻倍!")
+            game.fold *= 2
+        } else if (bottomCards.toListCards().contains(Car.BIG_JOKER) && bottomCards.toListCards()
+                .contains(Car.SMALL_JOKER)
+        ) {
+            sendMessage("底牌是王炸:${bottomCards.show()},翻倍!")
+            game.fold *= 2
+        } else {
+            sendMessage("底牌是:${bottomCards.show()}")
+        }
+
+        game.landlord = landlord
+        game.setNextPlayer(landlord)
+        landlord.sendMessage("你的手牌:\n" + " ${landlord.toHand()}")
+        if (round == 2) {
+            game.fold *= 2
+            sendMessage("${landlord.name} 角逐胜者,翻倍!请开始出牌!")
+        } else {
+            sendMessage("${landlord.name} 抢到了地主!请开始出牌!")
+        }
+
+        cards()
+    }
+
+    /**
+     * 出牌?
+     */
+    @Suppress("DuplicatedCode")
+    override suspend fun cards() {
+        status = GameStatus.BATTLE
+        var player = game.nextPlayer
+
+        // 比较的玩家
+        var maxPlayer: Player? = null
+        // 比较的手牌
+        var maxCards: List<Cards> = mutableListOf()
+        // 比较的牌类型
+        var maxForm: CardForm = CardForm.ERROR
+        val win: Player
+        // 出牌计数器
+        val cardsTimer = mutableMapOf<Player, Int>().apply {
+            players.forEach { put(it, 0) }
+        }
+
+        // 提取出牌后的公共操作
+        suspend fun handlePlay(player: Player, cards: List<Cards>, match: CardForm, isFirst: Boolean) {
+            val action = if (isFirst) "出牌" else "管上"
+            val msg = when (match) {
+                CardForm.BOMB -> "${player.name} : 炸弹(翻倍)! ${cards.cardsShow()}"
+                CardForm.TRIPLE_ONE -> "${player.name} : 三带一! ${cards.cardsShow()}"
+                CardForm.TRIPLE_TWO -> "${player.name} : 三带二! ${cards.cardsShow()}"
+                CardForm.QUEUE -> "${player.name} : 顺子! ${cards.cardsShow()}"
+                CardForm.GHOST_BOMB -> "${player.name} : 王炸(翻倍)!!!"
+                CardForm.QUEUE_TWO -> "${player.name} : 连对! ${cards.cardsShow()}"
+                CardForm.AIRCRAFT -> "${player.name} : 飞机! ${cards.cardsShow()}"
+                CardForm.AIRCRAFT_SINGLE -> "${player.name} : 飞机! ${cards.cardsShow()}"
+                CardForm.AIRCRAFT_PAIR -> "${player.name} : 飞机! ${cards.cardsShow()}"
+                else -> "${player.name} : $action ${cards.cardsShow()}"
+            }
+
+            if (player.playCards(cards)) {
+                sendMessage(msg)
+                val handSize = player.hand.sumOf { it.num }
+                if (handSize in 1..3) {
+                    sendMessage("${player.name} 只剩 $handSize 张牌了!")
+                }
+
+                maxPlayer = player
+                maxForm = match
+                maxCards = cards
+                cardsTimer[player] = (cardsTimer[player] ?: 0) + 1
+            } else {
+                sendMessage("错误!")
+            }
+        }
+
+        while (true) {
+            val isFirst = maxPlayer == null || maxPlayer == player
+            sendMessage(player, "请出牌!" + if (isFirst) "" else "或者过")
+
+            val nextMessage = player.nextMessage(DZConfig.timeOut) ?: run {
+                abnormalEnd(player)
+                return
+            }
+
+            val content = nextMessage.message.contentToString()
+
+            // 处理"过"的情况
+            if (!isFirst && content.matches(Regex("\\.{2,4}|go?|过|不要|要不起"))) {
+                player = game.nextPlayer
+                continue
+            }
+
+            // 处理出牌的情况
+            if (content.matches(Regex("^[0-9aAjJqQkK大小王炸]{1,20}$"))) {
+                val listCar = parseCardInput(content)
+                if (listCar.isEmpty()) {
+                    sendMessage(player, "出牌格式错误，请按正确格式出牌！")
+                    continue
+                }
+
+                if (!player.checkHand(listCar)) {
+                    sendMessage(player, "你现在的手牌无法这样出!")
+                    continue
+                }
+
+                val cards = listCar.toListCards()
+                val match = CardFormUtil.match(cards)
+
+                if (match == CardForm.ERROR) {
+                    sendMessage(player, "你的出牌不符合规则,请重新出牌!")
+                    continue
+                }
+
+                if (match == CardForm.BOMB || match == CardForm.GHOST_BOMB) {
+                    game.fold *= 2
+                }
+
+                // 检查牌型是否有效（如果是跟牌）
+                if (!isFirst && !checkEat(maxForm, match, maxCards, cards)) {
+                    sendMessage(player, "你要不起!")
+                    continue
+                }
+
+                // 处理出牌后的公共操作
+                handlePlay(player, cards, match, isFirst)
+
+                // 检查是否获胜
+                if (player.hand.isEmpty()) {
+                    win = player
+                    break
+                } else {
+                    player.sendMessage(player.toHand())
+                }
+
+                // 轮到下一位玩家
+                player = game.nextPlayer
+            } else {
+                sendMessage(player, "出牌格式错误，只能包含[0-9]、A、J、Q、K、大小王等字符！")
+            }
+        }
+
+        if (cardsTimer.filter { it.key != win }.map { it.value }.sum() == 0) {
+            sendMessage("${win.name} 春天!翻倍!")
+            game.fold *= 2
+        } else {
+            sendMessage("${win.name} 获胜!")
+        }
+
+        if (game.landlord == win) {
+            game.winPlayer.add(win)
+        } else {
+            game.winPlayer.addAll(game.players.filter { it != game.landlord })
+        }
+
+        stop()
+    }
+
+    /**
+     * ->对局结束
+     * ->计算倍率，计算积分，操作结果
+     */
+    override suspend fun stop() {
+        status = GameStatus.STOP
+        sendMessage("进入结算!")
+
+        val winName = game.winPlayer.joinToString(",") { it.name }
+        val integral = game.bottom * game.fold
+
+        val winPlayer = game.winPlayer
+        val losePlayer = players.filter { it !in winPlayer }
+
+        if (winPlayer.size == 1) {
+            sendMessage("$winName 是赢家! 获得狐币: $integral !")
+            FoxUserManager.getFoxUser(winPlayer.first()).addVictory(integral)
+            losePlayer.forEach {
+                FoxUserManager.getFoxUser(it).addLose(integral / 2)
+            }
+        } else {
+            sendMessage("$winName 是赢家! 分别获得狐币: ${integral / 2} !")
+            winPlayer.forEach {
+                FoxUserManager.getFoxUser(it).addVictory(integral / 2)
+            }
+            FoxUserManager.getFoxUser(losePlayer.first()).addLose(integral)
+        }
+
+
+        stopGame()
+        sendMessage("游戏结束!")
+    }
+
+    //==游戏逻辑私有方法
+
+    /**
+     * 游戏阶段异常结束
+     */
+    private suspend fun abnormalEnd(player: Player) {
+        val totalCoins = game.bottom
+        val validPlayers = players.filter { it != player }
+
+        // 确保只有两个人
+        require(validPlayers.size == 2) { "异常：应该有且仅有两个其他玩家！" }
+
+        // 计算每人分多少金币（整除）
+        val (p1, p2) = validPlayers
+        val half = totalCoins / 2
+        val remainder = totalCoins % 2  // 如果是奇数，剩一个金币
+
+        // 扣掉超时玩家的金币
+        FoxUserManager.getFoxUser(player).minusCoins(totalCoins)
+        // 公平分配：一个人拿 half + remainder，另一个人拿 half
+        FoxUserManager.getFoxUser(p1).addCoins(half + remainder)
+        FoxUserManager.getFoxUser(p2).addCoins(half)
+
+        sendMessage(
+            """
+            ${player.name} 出牌超时,导致对局消失,扣除${game.bottom}狐币给其他两位玩家!
+            ${p1.name} 获得 ${half + remainder} 狐币!
+            ${p2.name} 获得 $half 狐币!
+            另外,大家快去骂 ${player.name} 呀!
+        """.trimIndent()
+        )
+        stopGame()
+    }
+
+    /**
+     * 解析扑克牌输入字符串
+     * 支持格式：10、J、Q、K、A、大王、小王等
+     */
+    private fun parseCardInput(input: String): List<Car> {
+        val cards = mutableListOf<String>()
+        val regex = Regex("10|大王|小王|王炸|[2-9aAjJqQkK]|0")
+        var remaining = input
+
+        while (remaining.isNotEmpty()) {
+            val match = regex.find(remaining)
+                ?: // 遇到无法解析的内容
+                return emptyList()
+
+            val card = match.value
+            if (card == "王炸") {
+                return listOf(Car.BIG_JOKER, Car.SMALL_JOKER)
+            }
+            cards.add(
+                when (card) {
+                    "0" -> "10"  // 将0转换为10
+                    else -> card
+                }
+            )
+
+            remaining = remaining.substring(card.length)
+        }
+
+        return cards.map { Car.fromMarking(it)!! }
+    }
+
+    /**
+     * 检查吃不吃的起
+     * @return true 吃的起
+     */
+    private fun checkEat(maxForm: CardForm, nowForm: CardForm, maxCards: List<Cards>, nowCards: List<Cards>): Boolean {
+        //先判断炸弹
+        when (maxForm.value) {
+            2 -> if (nowForm.value == 1) return false
+            3 -> if (nowForm.value == 1) return false
+        }
+
+        //如果牌型相等,则分别判断
+        return if (maxForm == nowForm) {
+            maxForm.check(maxCards, nowCards)
+        } else {
+            if (nowForm.value > maxForm.value) {
+                nowForm == CardForm.BOMB || nowForm == CardForm.GHOST_BOMB
+            } else {
+                false
+            }
+        }
+    }
+
+    //==游戏过程辅助私有方法
+
+    private suspend fun GameTable.sendMessage(msg: String) {
+        this.group.sendMessage(msg)
+    }
+
+    private suspend fun GameTable.sendMessage(msg: MessageChain) {
+        this.group.sendMessage(msg)
+    }
+
+    private suspend fun GameTable.sendMessage(id: Long, msg: String) {
+        this.group.sendMessage(At(id).plus(PlainText(msg)))
+    }
+
+    private suspend fun GameTable.sendMessage(player: Player, msg: String) {
+        this.group.sendMessage(At(player.id).plus(PlainText(msg)))
+    }
+
+    private suspend fun Player.sendMessage(msg: String) {
+        bot.getFriend(this.id)?.sendMessage(msg)
+    }
+
+    private fun GameTable.cancelGame() {
+        GameEvent.cancelGame(group)
+    }
+
+    private suspend fun GameTable.stopGame() {
+        players.forEach { group[it.id]?.modifyAdmin(false) }
+        group.settings.isMuteAll = false
+        cancelGame()
+    }
+
+    /**
+     * 获取好友的下一条消息
+     */
+    suspend fun Player.nextMessage(): MessageEvent? = MessageUtil.nextMessage(this, 30)
+
+    /**
+     * 获取好友的下一条消息
+     */
+    suspend fun Player.nextMessage(timer: Int): MessageEvent? = MessageUtil.nextMessage(this, timer)
+}
