@@ -7,7 +7,6 @@ import cn.chahuyun.teafox.game.game.CardFormUtil.check
 import cn.chahuyun.teafox.game.util.CardUtil.cardsShow
 import cn.chahuyun.teafox.game.util.CardUtil.show
 import cn.chahuyun.teafox.game.util.CardUtil.toListCards
-import cn.chahuyun.teafox.game.util.CardUtil.contains
 import cn.chahuyun.teafox.game.util.FriendUtil
 import cn.chahuyun.teafox.game.util.GameTableUtil.sendMessage
 import cn.chahuyun.teafox.game.util.MessageUtil.nextMessage
@@ -49,7 +48,7 @@ class DizhuGameTable(
     /**
      * 牌库
      */
-    private val deck: List<Car> = Cards.createFullExpandDeck(),
+    private val deck: List<Card> = CardRanks.createFullExpandDeck(),
     /**
      * 默认对局类型
      */
@@ -68,7 +67,7 @@ class DizhuGameTable(
     /**
      * 底牌，先用空代替
      */
-    private lateinit var bottomCards: List<Car>
+    private lateinit var bottomCards: List<Card>
 
     /**
      * 掀桌异常
@@ -325,7 +324,7 @@ class DizhuGameTable(
         // 比较的玩家
         var maxPlayer: Player? = null
         // 比较的手牌
-        var maxCards: List<Cards> = mutableListOf()
+        var maxCards: List<CardRanks> = mutableListOf()
         // 比较的牌类型
         var maxForm: CardForm = CardForm.ERROR
         val win: Player
@@ -335,7 +334,7 @@ class DizhuGameTable(
         }
 
         // 提取出牌后的公共操作
-        suspend fun handlePlay(player: Player, cards: List<Cards>, match: CardForm, isFirst: Boolean) {
+        suspend fun handlePlay(player: Player, cards: List<CardRanks>, match: CardForm, isFirst: Boolean) {
             val action = if (isFirst) "出牌" else "管上"
             var msg = when (match) {
                 CardForm.BOMB -> "${player.name} : 炸弹(翻倍)! ${cards.cardsShow()}"
@@ -553,7 +552,7 @@ class DizhuGameTable(
      * 检查吃不吃的起
      * @return true 吃的起
      */
-    private fun checkEat(maxForm: CardForm, nowForm: CardForm, maxCards: List<Cards>, nowCards: List<Cards>): Boolean {
+    private fun checkEat(maxForm: CardForm, nowForm: CardForm, maxCards: List<CardRanks>, nowCards: List<CardRanks>): Boolean {
         //先判断炸弹
         when (maxForm.value) {
             2 -> if (nowForm.value == 1) return false

@@ -1,7 +1,10 @@
 package cn.chahuyun.teafox.game
 
 import cn.chahuyun.teafox.game.util.CardUtil.show
-import cn.chahuyun.teafox.game.util.CardUtil.toListCar
+import cn.chahuyun.teafox.game.util.RankUtils
+import java.awt.Color
+import java.awt.Color.BLACK
+import java.awt.Color.RED
 
 
 /**
@@ -75,7 +78,7 @@ data class Game(
     /**
      * 给这个玩家加一张牌
      */
-    fun addHand(playerIndex: Int, car: Car) {
+    fun addHand(playerIndex: Int, car: Card) {
         players[playerIndex].addHand(car)
     }
 
@@ -90,15 +93,15 @@ data class Player(
     /**
      * 手牌
      */
-    val hand: MutableList<Cards> = mutableListOf(),
+    val hand: MutableList<Card> = mutableListOf(),
 
     /**
      * 是否允许出牌（可用于托管、超时等情况）
      */
     var canPlay: Boolean = true,
 ) {
-    fun addHand(car: Car) {
-        hand.find { it.car == car }?.let { it.num++ } ?: run { hand.add(Cards(car)) }
+    fun addHand(car: Card) {
+        hand.add(car)
     }
 
     /**
@@ -109,58 +112,34 @@ data class Player(
     }
 
     /**
-     * 检查手牌是否足够出牌
-     * @return true 够出
+     * 检查是否可以出牌
      */
-    fun checkHand(cards: List<Car>): Boolean {
-        // 将手牌转换为计数映射
-        val handCountMap = hand.associate { it.car to it.num }
+    fun canPlayCards(cards: List<Card>) =
+        RankUtils.canPlayCards(hand, cards)
 
-        // 将要出的牌分组计数
-        val playCountMap = cards.groupingBy { it }.eachCount()
-
-        // 检查每种牌的数量是否足够
-        return playCountMap.all { (car, count) ->
-            handCountMap[car]?.let { it >= count } ?: false
-        }
+    /**
+     * 出牌
+     */
+    fun playCards(cards: List<Card>): Boolean {
+        return RankUtils.removeCards(hand, cards)
     }
 
     /**
-     * 出牌 - 从手牌中移除指定的牌
-     * @param cardsToPlay 要出的牌
-     * @return 出牌是否成功
+     * 添加手牌
      */
-    fun playCards(cardsToPlay: List<Cards>): Boolean {
-        // 先检查手牌是否足够
-        if (!checkHand(cardsToPlay.toListCar())) {
-            return false
-        }
-
-        // 从手牌中移除牌
-        cardsToPlay.forEach { cardToPlay ->
-            val handCard = hand.find { it.car == cardToPlay.car }
-            if (handCard != null) {
-                handCard.num -= cardToPlay.num
-
-                // 如果数量减到0以下或等于0，从手牌中移除
-                if (handCard.num <= 0) {
-                    hand.remove(handCard)
-                }
-            }
-        }
-
-        return true
+    fun addCard(card: Card) {
+        hand.add(card)
     }
 }
 
 /**
  * 手牌
  */
-data class Cards(
+data class CardRanks(
     /**
      * 牌
      */
-    val car: Car,
+    val car: Card,
     /**
      * 数量
      */
@@ -168,26 +147,50 @@ data class Cards(
 ) {
     companion object {
         /**
-         * 创建一副牌
+         * 创建一副无花色的牌
          */
         @JvmStatic
-        fun createFullDeck(): List<Cards> {
+        fun createFullDeck(): List<CardRanks> {
             return listOf(
-                Cards(Car.A, 4),
-                Cards(Car.TWO, 4),
-                Cards(Car.THREE, 4),
-                Cards(Car.FOUR, 4),
-                Cards(Car.FIVE, 4),
-                Cards(Car.SIX, 4),
-                Cards(Car.SEVEN, 4),
-                Cards(Car.EIGHT, 4),
-                Cards(Car.NINE, 4),
-                Cards(Car.TEN, 4),
-                Cards(Car.J, 4),
-                Cards(Car.Q, 4),
-                Cards(Car.K, 4),
-                Cards(Car.SMALL_JOKER, 1),
-                Cards(Car.BIG_JOKER, 1)
+                CardRanks(Card(CardRank.ACE, CardColor.HEARTS), 4),
+                CardRanks(Card(CardRank.TWO, CardColor.HEARTS), 4),
+                CardRanks(Card(CardRank.THREE, CardColor.HEARTS), 4),
+                CardRanks(Card(CardRank.FOUR, CardColor.HEARTS), 4),
+                CardRanks(Card(CardRank.FIVE, CardColor.HEARTS), 4),
+                CardRanks(Card(CardRank.SIX, CardColor.HEARTS), 4),
+                CardRanks(Card(CardRank.SEVEN, CardColor.HEARTS), 4),
+                CardRanks(Card(CardRank.EIGHT, CardColor.HEARTS), 4),
+                CardRanks(Card(CardRank.NINE, CardColor.HEARTS), 4),
+                CardRanks(Card(CardRank.TEN, CardColor.HEARTS), 4),
+                CardRanks(Card(CardRank.JACK, CardColor.HEARTS), 4),
+                CardRanks(Card(CardRank.QUEEN, CardColor.HEARTS), 4),
+                CardRanks(Card(CardRank.KING, CardColor.HEARTS), 4),
+                CardRanks(Card(CardRank.SMALL_JOKER, CardColor.HEARTS), 1),
+                CardRanks(Card(CardRank.BIG_JOKER, CardColor.HEARTS), 1)
+            )
+        }
+
+        /**
+         * 创建一副无花色的牌
+         */
+        @JvmStatic
+        fun createFullFourColorDeck(): List<CardRanks> {
+            return listOf(
+                createFourColorDeck(CardRank.ACE),
+                createFourColorDeck(CardRank.TWO),
+                createFourColorDeck(CardRank.THREE),
+                createFourColorDeck(CardRank.FOUR),
+                createFourColorDeck(CardRank.FIVE),
+                createFourColorDeck(CardRank.SIX),
+                createFourColorDeck(CardRank.SEVEN),
+                createFourColorDeck(CardRank.EIGHT),
+                createFourColorDeck(CardRank.NINE),
+                createFourColorDeck(CardRank.TEN),
+                createFourColorDeck(CardRank.JACK),
+                createFourColorDeck(CardRank.QUEEN),
+                createFourColorDeck(CardRank.KING),
+                CardRanks(Card(CardRank.SMALL_JOKER, CardColor.HEARTS), 1),
+                CardRanks(Card(CardRank.BIG_JOKER, CardColor.HEARTS), 1)
             )
         }
 
@@ -195,23 +198,94 @@ data class Cards(
          * 创建一副随机打乱展开的牌
          */
         @JvmStatic
-        fun createFullExpandDeck(): List<Car> {
+        fun createFullExpandDeck(): List<Card> {
             return createFullDeck().flatMap { cars -> List(cars.num) { cars.car } }.shuffled()
         }
 
-
+        /**
+         * 创建四色牌
+         */
+        @JvmStatic
+        fun createFourColorDeck(rank: CardRank): List<Card> {
+            return listOf(
+                Card(rank, CardColor.HEARTS),
+                Card(rank, CardColor.SPADES),
+                Card(rank, CardColor.DIAMONDS),
+                Card(rank, CardColor.CLUBS)
+            )
+        }
     }
 }
 
+
 /**
- * 牌
+ * 单张牌
  */
-enum class Car(
-    val value: Int,
-    val marking: String,
-    val sort: Int,
+data class Card(
+    val rank: CardRank,
+    val color: CardColor
 ) {
-    TWO(2, "2", 13),
+    companion object {
+        /**
+         * 寻找牌面值
+         */
+        @JvmStatic
+        fun fromMarking(display: String): CardRank? {
+            val normalized = display.trim().uppercase()
+            return CardRank.entries.find {
+                it.display == normalized
+            }
+        }
+    }
+
+    override fun toString(): String {
+        return when (rank) {
+            CardRank.SMALL_JOKER, CardRank.BIG_JOKER -> "[${rank.display}]"
+            else -> "[${color.symbol}${rank.display}]"
+        }
+    }
+}
+
+
+/**
+ * 花色
+ */
+enum class CardColor(val symbol: String, val value: Int, val color: Color) {
+    /**
+     * 红心
+     */
+    HEARTS("♥", 1, RED),
+
+    /**
+     * 黑桃
+     */
+    SPADES("♠", 2, BLACK),
+
+    /**
+     * 方块
+     */
+    DIAMONDS("♦", 3, RED),
+
+    /**
+     * 梅花
+     */
+    CLUBS("♣", 4, BLACK),
+
+    /**
+     * 红王
+     */
+    RED_JOKER("红王", 5, RED),
+
+    /**
+     * 黑王
+     */
+    BLACK_JOKER("黑王", 6, BLACK)
+}
+
+/**
+ * 牌面值
+ */
+enum class CardRank(val value: Int, val display: String, val sort: Int) {
     THREE(3, "3", 1),
     FOUR(4, "4", 2),
     FIVE(5, "5", 3),
@@ -220,30 +294,13 @@ enum class Car(
     EIGHT(8, "8", 6),
     NINE(9, "9", 7),
     TEN(10, "10", 8),
-    J(11, "J", 9),
-    Q(12, "Q", 10),
-    K(13, "K", 11),
-    A(14, "A", 12),
-
-    // 添加大小王，通常它们没有数值，或者可以根据游戏规则给予特定值
-    SMALL_JOKER(-1, "小王", 14),  // 小王
-    BIG_JOKER(-2, "大王", 15);      // 大王
-
-    companion object {
-        // 如果需要根据字符串查找对应的枚举成员，可以提供一个辅助方法
-        fun fromMarking(marking: String): Car? {
-            val normalized = marking.trim().uppercase()
-            return entries.find {
-                it.marking == normalized
-            }
-        }
-    }
-
-    override fun toString(): String {
-        return "[$marking]"
-    }
-
-
+    JACK(11, "J", 9),
+    QUEEN(12, "Q", 10),
+    KING(13, "K", 11),
+    ACE(14, "A", 12),
+    TWO(15, "2", 13),
+    SMALL_JOKER(16, "小王", 14),
+    BIG_JOKER(17, "大王", 15)
 }
 
 /**
