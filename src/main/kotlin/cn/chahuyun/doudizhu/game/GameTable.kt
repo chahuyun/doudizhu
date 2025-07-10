@@ -382,8 +382,10 @@ class GameTable(
         // 比较的牌类型
         var maxForm: CardForm = CardForm.ERROR
         val win: Player
-
-        val cardsTimer = players.associateWith { 0 }.toMutableMap()
+        // 出牌计数器
+        val cardsTimer = mutableMapOf<Player, Int>().apply {
+            players.forEach { put(it, 0) }
+        }
 
         // 提取出牌后的公共操作
         suspend fun handlePlay(player: Player, cards: List<Cards>, match: CardForm, isFirst: Boolean) {
@@ -411,7 +413,7 @@ class GameTable(
                 maxPlayer = player
                 maxForm = match
                 maxCards = cards
-                cardsTimer[player] = cardsTimer[player]!! + 1
+                cardsTimer[player] = (cardsTimer[player] ?: 0) + 1
             } else {
                 sendMessage("错误!")
             }
