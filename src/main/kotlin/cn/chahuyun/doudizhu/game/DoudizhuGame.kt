@@ -202,15 +202,15 @@ class DizhuGameTable(
 
         sendMessage("游戏开始，请移至好友查看手牌!")
 
-        dizhu()
+        initial()
     }
 
     /**
      * ->抢地主阶段
      * ->决定地主，补牌
      */
-    override suspend fun dizhu() {
-        status = GameStatus.DIZHU
+    override suspend fun initial() {
+        status = GameStatus.INITIAL
         var nextPlayer: Player
 
         var landlord: Player? = null
@@ -320,7 +320,7 @@ class DizhuGameTable(
     }
 
     /**
-     * 出牌?
+     * ->出牌
      */
     @Suppress("DuplicatedCode")
     override suspend fun cards() {
@@ -438,8 +438,8 @@ class DizhuGameTable(
         }
 
         if (cardsTimer.filter { it.key != win }.map { it.value }.sum() == 0) {
-            sendMessage("${win.name} 春天!翻倍!")
-            game.fold *= 2
+            sendMessage("${win.name} 春天!翻4倍!!")
+            game.fold *= 4
         } else {
             sendMessage("${win.name} 获胜!")
         }
