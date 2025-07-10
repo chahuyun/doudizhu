@@ -10,15 +10,16 @@ import cn.chahuyun.doudizhu.FoxUserManager.getFoxUser
 import cn.chahuyun.doudizhu.game.CardFormUtil.check
 import cn.chahuyun.doudizhu.util.MessageUtil.nextMessage
 import cn.chahuyun.doudizhu.util.PlayerUtil
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.MemberPermission
 import net.mamoe.mirai.event.events.MessageEvent
-import net.mamoe.mirai.message.data.At
-import net.mamoe.mirai.message.data.MessageChain
-import net.mamoe.mirai.message.data.MessageChainBuilder
-import net.mamoe.mirai.message.data.PlainText
+import net.mamoe.mirai.message.data.*
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
@@ -119,6 +120,9 @@ class GameTable(
      */
     private lateinit var bottomCards: List<Car>
 
+    private inner class TableFlipException(val player: Player) : RuntimeException()
+    private inner class VotingTimeoutException : RuntimeException()
+
     /**
      * ->游戏开始
      * ->检查好友，开启禁言，发牌
@@ -147,42 +151,62 @@ class GameTable(
             }
         }
 
+        val votes = ConcurrentHashMap<Long, Int>() // 线程安全的Map
 
-        val votes = mutableMapOf<Long, Int>() // key: 玩家ID, value: 输入的底分
+        try {
+            coroutineScope {
+                sendMessage(buildMessageChain {
+                    players.forEach { player ->
+                        +At(player.id)
+                    }
+                    +"请同时投票底分(${type.min}~${type.max})，发送「掀桌」停止配置"
+                })
 
-        val message = MessageChainBuilder().apply {
-            players.forEach { player ->
-                +At(player.id)
+                // 为每个玩家启动异步任务
+                players.map { player ->
+                    async {
+                        try {
+                            val nextMessage = nextMessage(player, DZConfig.timeOut)
+                                ?: throw VotingTimeoutException()
+
+                            val input = nextMessage.message.contentToString().trim()
+
+                            if (input.startsWith("掀桌")) {
+                                throw TableFlipException(player)
+                            }
+
+                            val bet = input.toIntOrNull()
+                            if (bet != null && bet in type.min..type.max) {
+                                votes[player.id] = bet
+                                sendMessage("${player.name} 配置底分为: $bet!")
+                            } else {
+                                sendMessage("${player.name} 输入无效，底分范围为 ${type.min}~${type.max}，已使用默认值 ${type.min}。")
+                                votes[player.id] = type.min
+                            }
+                        } catch (e: Exception) {
+                            when (e) {
+                                is TableFlipException, is VotingTimeoutException -> throw e
+                                else -> {
+                                    // 其他异常使用默认值
+                                    votes[player.id] = type.min
+                                }
+                            }
+                        }
+                    }
+                }.awaitAll()
             }
-            +"请有序投票底分(${type.min}~${type.max})，发送“掀桌”停止配置"
-        }.build()
-
-        sendMessage(message)
-
-        // 开始收集输入
-        for (player in players) {
-            val nextMessage = nextMessage(player, DZConfig.timeOut) ?: run {
-                sendMessage("配置超时,(╯‵□′)╯︵┻━┻")
-                cancelGame()
-                return
-            }
-
-            val input = nextMessage.message.contentToString().trim()
-
-            if (input.startsWith("掀桌")) {
-                sendMessage("${player.name} 掀桌(╯‵□′)╯︵┻━┻")
-                cancelGame()
-                return
-            }
-
-            val bet = input.toIntOrNull()
-            if (bet != null && bet in type.min..type.max) {
-                votes[player.id] = bet
-                sendMessage("${player.name} 配置底分为: $bet!")
-            } else {
-                sendMessage("${player.name} 输入无效，底分范围为 ${type.min}~${type.max}，已跳过本轮投票。")
-                votes[player.id] = type.min // 可选：默认最小值
-            }
+        } catch (e: TableFlipException) {
+            sendMessage("${e.player.name} 掀桌(╯‵□′)╯︵┻━┻")
+            cancelGame()
+            return
+        } catch (e: VotingTimeoutException) {
+            sendMessage("配置超时,(╯‵□′)╯︵┻━┻")
+            cancelGame()
+            return
+        } catch (e: Exception) {
+            sendMessage("配置过程中发生错误，游戏取消")
+            cancelGame()
+            return
         }
 
         // 计算平均值
@@ -359,6 +383,8 @@ class GameTable(
         var maxForm: CardForm = CardForm.ERROR
         val win: Player
 
+        val cardsTimer = players.associateWith { 0 }.toMutableMap()
+
         // 提取出牌后的公共操作
         suspend fun handlePlay(player: Player, cards: List<Cards>, match: CardForm, isFirst: Boolean) {
             val action = if (isFirst) "出牌" else "管上"
@@ -385,6 +411,7 @@ class GameTable(
                 maxPlayer = player
                 maxForm = match
                 maxCards = cards
+                cardsTimer[player] = cardsTimer[player]!! + 1
             } else {
                 sendMessage("错误!")
             }
@@ -457,7 +484,12 @@ class GameTable(
             }
         }
 
-        sendMessage("${win.name} 获胜!")
+        if (cardsTimer.filter { it.key != win }.map{it.value}.sum() == 0){
+            sendMessage("${win.name} 春天!翻倍!")
+            game.fold *= 2
+        }else{
+            sendMessage("${win.name} 获胜!")
+        }
 
         if (game.landlord == win) {
             game.winPlayer.add(win)

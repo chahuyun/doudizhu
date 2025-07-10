@@ -43,13 +43,13 @@ class GameEvent {
     @MessageAuthorize(text = ["开桌", "来一局"])
     suspend fun startGameMin(event: GroupMessageEvent) = startGame(event, GameTableCoinsType.NORMAL)
 
-    @MessageAuthorize(text = ["开桌 大", "┳━┳", "来一局大的"])
+    @MessageAuthorize(text = ["开桌 大", "┳━┳", "来局大的", "来一局大的"])
     suspend fun startGameMax(event: GroupMessageEvent) = startGame(event, GameTableCoinsType.BIG)
 
     @MessageAuthorize(text = ["开桌 绝杀", "整一局绝杀局", "来父子局"])
     suspend fun startGameHuge(event: GroupMessageEvent) = startGame(event, GameTableCoinsType.HUGE)
 
-    @MessageAuthorize(text = ["开桌 巅峰", "来巅峰局","来癫疯局"])
+    @MessageAuthorize(text = ["开桌 巅峰", "来巅峰局", "来癫疯局"])
     suspend fun startGamePeak(event: GroupMessageEvent) = startGame(event, GameTableCoinsType.PEAK)
 
     @MessageAuthorize(text = ["我的狐币", "狐币"])
@@ -186,11 +186,12 @@ class GameEvent {
                 if (playerFoxUser.coins!! < type.guaranteed) {
                     if (!getFoxCoins(playerFoxUser, messageEvent, type)) continue
                 }
-                if (!players.any { it.id == newPlayer.id }) { // 防止重复加入
-                    players.add(newPlayer)
-                    group.sendMessage("${newPlayer.name} 加入了游戏！当前玩家：${players.joinToString(",") { it.name }}")
-                }
-            }else if (content.matches("^掀桌".toRegex())) {
+                // 防止重复加入
+                if (players.any { it.id == newPlayer.id } || !checkPlayerInGame(newPlayer, group)) continue
+
+                players.add(newPlayer)
+                group.sendMessage("${newPlayer.name} 加入了游戏！当前玩家：${players.joinToString(",") { it.name }}")
+            } else if (content.matches("^掀桌".toRegex())) {
                 group.sendMessage("掀桌(╯‵□′)╯︵┻━┻")
                 gameTables.remove(group.id)
                 return
@@ -221,5 +222,17 @@ class GameEvent {
         }
         event.subject.sendMessage(reply)
         return true
+    }
+
+    /**
+     * 检查玩家是否在其他游戏桌里面
+     * @return true 不在
+     */
+    private fun checkPlayerInGame(player: Player, group: Group): Boolean {
+        return if (gameTables.size == 1) {
+            true
+        } else {
+            !gameTables.filter { it.key != group.id }.any { player in it.value.players }
+        }
     }
 }
