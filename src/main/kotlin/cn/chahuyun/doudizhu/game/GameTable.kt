@@ -18,7 +18,10 @@ import net.mamoe.mirai.Bot
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.MemberPermission
 import net.mamoe.mirai.event.events.MessageEvent
-import net.mamoe.mirai.message.data.*
+import net.mamoe.mirai.message.data.At
+import net.mamoe.mirai.message.data.MessageChain
+import net.mamoe.mirai.message.data.PlainText
+import net.mamoe.mirai.message.data.buildMessageChain
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -106,9 +109,9 @@ class GameTable(
     /**
      * 默认对局类型
      */
-    private val type: GameTableCoinsType = GameTableCoinsType.NORMAL
+    private val type: GameTableCoinsType = GameTableCoinsType.NORMAL,
 
-) : GameTableProcess {
+    ) : GameTableProcess {
 
     /**
      * 对局信息
@@ -424,8 +427,7 @@ class GameTable(
             sendMessage(player, "请出牌!" + if (isFirst) "" else "或者过")
 
             val nextMessage = player.nextMessage(DZConfig.timeOut) ?: run {
-                sendMessage("${player.name} 出牌超时,导致对局消失,大家快去骂他呀!")
-                stopGame()
+                abnormalEnd(player)
                 return
             }
 
@@ -486,10 +488,10 @@ class GameTable(
             }
         }
 
-        if (cardsTimer.filter { it.key != win }.map{it.value}.sum() == 0){
+        if (cardsTimer.filter { it.key != win }.map { it.value }.sum() == 0) {
             sendMessage("${win.name} 春天!翻倍!")
             game.fold *= 2
-        }else{
+        } else {
             sendMessage("${win.name} 获胜!")
         }
 
@@ -536,6 +538,36 @@ class GameTable(
     }
 
     //==游戏逻辑私有方法
+
+    /**
+     * 游戏阶段异常结束
+     */
+    private suspend fun abnormalEnd(player: Player) {
+        val totalCoins = game.bottom
+        val validPlayers = players.filter { it != player }
+
+        // 确保只有两个人
+        require(validPlayers.size == 2) { "异常：应该有且仅有两个其他玩家！" }
+
+        // 计算每人分多少金币（整除）
+        val (p1, p2) = validPlayers
+        val half = totalCoins / 2
+        val remainder = totalCoins % 2  // 如果是奇数，剩一个金币
+
+        // 扣掉超时玩家的金币
+        getFoxUser(player).minusCoins(totalCoins)
+        // 公平分配：一个人拿 half + remainder，另一个人拿 half
+        getFoxUser(p1).addCoins(half + remainder)
+        getFoxUser(p2).addCoins(half)
+
+        sendMessage("""
+            ${player.name} 出牌超时,导致对局消失,扣除${game.bottom}狐币给其他两位玩家!
+            ${p1.name} 获得 ${half + remainder} 狐币!
+            ${p2.name} 获得 $half 狐币!
+            另外,大家快去骂 ${player.name} 呀!
+        """.trimIndent())
+        stopGame()
+    }
 
     /**
      * 解析扑克牌输入字符串

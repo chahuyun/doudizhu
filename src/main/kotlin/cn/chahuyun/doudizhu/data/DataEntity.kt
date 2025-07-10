@@ -1,5 +1,6 @@
 package cn.chahuyun.doudizhu.data
 
+import cn.chahuyun.hibernateplus.HibernateFactory
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -64,6 +65,22 @@ data class FoxUser(
         if (total == 0) return 0.0
         val rate = (victory ?: 0).toDouble() / total.toDouble() * 100
         return String.format("%.1f", rate).toDouble()
+    }
+
+    /**
+     * 添加狐币
+     */
+    fun addCoins(coins: Int) {
+        this.coins = (this.coins ?: 0) + coins
+        HibernateFactory.merge(this)
+    }
+
+    /**
+     * 减少狐币
+     */
+    fun minusCoins(coins: Int) {
+        this.coins = (this.coins ?: 0) - coins
+        HibernateFactory.merge(this)
     }
 }
 
