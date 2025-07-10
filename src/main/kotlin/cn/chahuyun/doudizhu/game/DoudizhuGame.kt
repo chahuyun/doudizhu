@@ -342,7 +342,7 @@ class DizhuGameTable(
         // 提取出牌后的公共操作
         suspend fun handlePlay(player: Player, cards: List<Cards>, match: CardForm, isFirst: Boolean) {
             val action = if (isFirst) "出牌" else "管上"
-            val msg = when (match) {
+            var msg = when (match) {
                 CardForm.BOMB -> "${player.name} : 炸弹(翻倍)! ${cards.cardsShow()}"
                 CardForm.TRIPLE_ONE -> "${player.name} : 三带一! ${cards.cardsShow()}"
                 CardForm.TRIPLE_TWO -> "${player.name} : 三带二! ${cards.cardsShow()}"
@@ -358,7 +358,7 @@ class DizhuGameTable(
             if (player.playCards(cards)) {
                 val handSize = player.hand.sumOf { it.num }
                 if (handSize in 1..3) {
-                    msg.plus("\n${player.name} 只剩 $handSize 张牌了!")
+                    msg = msg.plus("\n${player.name} 只剩 $handSize 张牌了!")
                 }
 
                 sendMessage(msg)
