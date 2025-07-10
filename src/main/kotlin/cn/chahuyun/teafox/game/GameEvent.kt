@@ -3,21 +3,20 @@ package cn.chahuyun.teafox.game
 import cn.chahuyun.authorize.EventComponent
 import cn.chahuyun.authorize.MessageAuthorize
 import cn.chahuyun.authorize.utils.MessageUtil.sendMessageQuery
-import cn.chahuyun.teafox.game.TeaFoxGames.debug
+import cn.chahuyun.hibernateplus.HibernateFactory
 import cn.chahuyun.teafox.game.FoxUserManager.getFoxUser
+import cn.chahuyun.teafox.game.TeaFoxGames.debug
 import cn.chahuyun.teafox.game.data.FoxUser
 import cn.chahuyun.teafox.game.game.DizhuGameTable
 import cn.chahuyun.teafox.game.game.GameTable
-import cn.chahuyun.teafox.game.util.CustomForwardDisplayStrategy
+import cn.chahuyun.teafox.game.util.MessageUtil.buildForwardMessage
 import cn.chahuyun.teafox.game.util.MessageUtil.nextGroupMessageEvent
-import cn.chahuyun.hibernateplus.HibernateFactory
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.events.GroupMessageEvent
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.PlainText
-import net.mamoe.mirai.message.data.buildForwardMessage
 
 /**
  * 游戏事件
@@ -71,16 +70,13 @@ class GameEvent {
 
         var no = 1
         val message = event.buildForwardMessage(
-            displayStrategy =
-            CustomForwardDisplayStrategy(
-                titleGenerator = "群聊的聊天记录",
-                previewGenerator = listOf(
-                    "${DZConfig.botName}:分享一个炸裂的瓜!",
-                    "${DZConfig.botName}:[图片]",
-                    "${sender.nameCardOrNick}:卧槽,这是真的吗?"
-                ),
-                summarySize = 10
-            )
+            titleGenerator = "群聊的聊天记录",
+            previewGenerator = listOf(
+                "${DZConfig.botName}:分享一个炸裂的瓜!",
+                "${DZConfig.botName}:[图片]",
+                "${sender.nameCardOrNick}:卧槽,这是真的吗?"
+            ),
+            summarySize = 11
         ) {
             bot named DZConfig.botName says "以下是胜率排行榜↓:"
             list.forEach {
@@ -109,16 +105,13 @@ class GameEvent {
 
         var no = 1
         val message = event.buildForwardMessage(
-            displayStrategy =
-            CustomForwardDisplayStrategy(
-                titleGenerator = "群聊的聊天记录",
-                previewGenerator = listOf(
-                    "${sender.nameCardOrNick}:给兄弟们来点豪堪的!",
-                    "${sender.nameCardOrNick}:[图片]",
-                    "${sender.nameCardOrNick}:[图片]",
-                ),
-                summarySize = 10
-            )
+            titleGenerator = "群聊的聊天记录",
+            previewGenerator = listOf(
+                "${sender.nameCardOrNick}:给兄弟们来点豪堪的!",
+                "${sender.nameCardOrNick}:[图片]",
+                "${sender.nameCardOrNick}:[图片]",
+            ),
+            summarySize = 11
         ) {
             bot named DZConfig.botName says "以下是狐币排行榜↓:"
             list.forEach {

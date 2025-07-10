@@ -11,6 +11,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.event.events.GroupMessageEvent
 import net.mamoe.mirai.event.events.MessageEvent
+import net.mamoe.mirai.message.data.ForwardMessage
+import net.mamoe.mirai.message.data.ForwardMessageBuilder
 import net.mamoe.mirai.message.data.MessageChain
 
 /**
@@ -264,4 +266,40 @@ object MessageUtil {
 
 
     // == 其他消息工具 ==
+
+    /**
+     * 构建一条转发消息，支持自定义显示策略。
+     *
+     * 此方法基于 [ForwardMessageBuilder] 和自定义的 [CustomForwardDisplayStrategy]，
+     * 允许开发者灵活设置转发消息的标题、摘要、预览内容等信息。
+     *
+     * @param titleGenerator 转发消息的标题，默认为 "群聊的聊天记录"
+     * @param briefGenerator 转发消息的简要描述，默认为 "[聊天记录]"
+     * @param previewGenerator 转发消息的预览内容列表，默认包含两条示例消息
+     * @param summarySize 摘要中显示的消息条数，默认为 10 条
+     * @param summaryGenerator 摘要内容生成器，默认为 "查看${summarySize}条转发消息"
+     * @param sourceGenerator 转发消息来源描述，默认为 "聊天记录"
+     * @param block 可选的构建回调，用于进一步自定义 [ForwardMessageBuilder]
+     * @return 返回构建完成的 [ForwardMessage]
+     */
+    @JvmSynthetic
+    fun MessageEvent.buildForwardMessage(
+        titleGenerator: String = "群聊的聊天记录",
+        briefGenerator: String = "[聊天记录]",
+        previewGenerator: List<String> = mutableListOf("放空:消息A", "放空:消息B"),
+        summarySize: Int = 10,
+        summaryGenerator: String = "查看${summarySize}条转发消息",
+        sourceGenerator: String = "聊天记录",
+        block: ForwardMessageBuilder.() -> Unit
+    ): ForwardMessage = ForwardMessageBuilder(this.subject).apply {
+        this.displayStrategy = CustomForwardDisplayStrategy(
+            titleGenerator,
+            briefGenerator,
+            previewGenerator,
+            summarySize,
+            summaryGenerator,
+            sourceGenerator
+        )
+    }.apply(block).build()
+
 }
