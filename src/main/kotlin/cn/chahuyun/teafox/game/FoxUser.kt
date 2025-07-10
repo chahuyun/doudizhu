@@ -1,7 +1,7 @@
-package cn.chahuyun.doudizhu
+package cn.chahuyun.teafox.game
 
-import cn.chahuyun.doudizhu.data.FoxCoins
-import cn.chahuyun.doudizhu.data.FoxUser
+import cn.chahuyun.teafox.game.data.FoxCoins
+import cn.chahuyun.teafox.game.data.FoxUser
 import cn.chahuyun.hibernateplus.HibernateFactory
 import net.mamoe.mirai.contact.User
 import java.time.LocalDateTime

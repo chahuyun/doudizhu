@@ -1,15 +1,15 @@
-package cn.chahuyun.doudizhu
+package cn.chahuyun.teafox.game
 
 import cn.chahuyun.authorize.EventComponent
 import cn.chahuyun.authorize.MessageAuthorize
 import cn.chahuyun.authorize.utils.MessageUtil.sendMessageQuery
-import cn.chahuyun.doudizhu.DouDiZhu.debug
-import cn.chahuyun.doudizhu.FoxUserManager.getFoxUser
-import cn.chahuyun.doudizhu.data.FoxUser
-import cn.chahuyun.doudizhu.game.DizhuGameTable
-import cn.chahuyun.doudizhu.game.GameTable
-import cn.chahuyun.doudizhu.util.CustomForwardDisplayStrategy
-import cn.chahuyun.doudizhu.util.MessageUtil.nextGroupMessage
+import cn.chahuyun.teafox.game.TeaFoxGames.debug
+import cn.chahuyun.teafox.game.FoxUserManager.getFoxUser
+import cn.chahuyun.teafox.game.data.FoxUser
+import cn.chahuyun.teafox.game.game.DizhuGameTable
+import cn.chahuyun.teafox.game.game.GameTable
+import cn.chahuyun.teafox.game.util.CustomForwardDisplayStrategy
+import cn.chahuyun.teafox.game.util.MessageUtil.nextGroupMessageEvent
 import cn.chahuyun.hibernateplus.HibernateFactory
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.nameCardOrNick
@@ -76,8 +76,8 @@ class GameEvent {
                 titleGenerator = "群聊的聊天记录",
                 previewGenerator = listOf(
                     "${DZConfig.botName}:分享一个炸裂的瓜!",
-                    "${sender.nameCardOrNick}:卧槽,这是真的吗?",
-                    "${DZConfig.botName}:[图片]"
+                    "${DZConfig.botName}:[图片]",
+                    "${sender.nameCardOrNick}:卧槽,这是真的吗?"
                 ),
                 summarySize = 10
             )
@@ -96,7 +96,6 @@ class GameEvent {
 
         event.subject.sendMessage(message)
     }
-
 
     @MessageAuthorize(text = ["狐币榜"])
     suspend fun viewCoins(event: GroupMessageEvent) {
@@ -173,7 +172,7 @@ class GameEvent {
 
         debug("等待加入游戏!")
         while (players.size < 3) {
-            val messageEvent = nextGroupMessage(group, DZConfig.timeOut) ?: run {
+            val messageEvent = nextGroupMessageEvent(group, DZConfig.timeOut) ?: run {
                 group.sendMessage("等待玩家加入超时，游戏未能开始(╯‵□′)╯︵┻━┻")
                 gameTables.remove(group.id)
                 return // 如果超时则退出

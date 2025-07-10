@@ -1,4 +1,4 @@
-package cn.chahuyun.doudizhu
+package cn.chahuyun.teafox.game
 
 import cn.chahuyun.authorize.PermissionServer
 import net.mamoe.mirai.Bot
@@ -12,12 +12,12 @@ import net.mamoe.mirai.event.GlobalEventChannel
 import net.mamoe.mirai.event.events.BotOnlineEvent
 import net.mamoe.mirai.event.events.MessageEvent
 
-object DouDiZhu : KotlinPlugin(
+object TeaFoxGames : KotlinPlugin(
     JvmPluginDescription(
-        "cn.chahuyun.doudizhu", "1.0.0", "Fox-doudizhu"
+        "cn.chahuyun.teafox.games", "1.0.0", "TeaFoxGames"
     ) {
         author("moyuyanli")
-        info("FeaFox-DouDiZhu")
+        info("TeaFoxGames 茶狐云的游戏机")
 
         dependsOn("cn.chahuyun.HuYanAuthorize", ">=1.2.0", false)
 //        dependsOn("cn.chahuyun.HuYanEconomy",">=1.7.6",true)
@@ -39,30 +39,30 @@ object DouDiZhu : KotlinPlugin(
     lateinit var channel: EventChannel<MessageEvent>
 
     override fun PluginComponentStorage.onLoad() {
-        logger.debug("fox doudizhu 开始加载!")
+        logger.debug("TeaFoxGames 开始加载!")
     }
 
     override fun onEnable() {
-        logger.debug("fox doudizhu 启动中...")
+        logger.debug("TeaFoxGames 启动中...")
         DZConfig.reload()
         DZDataConfig.reload()
 
         DataManager.init()
 
-        PermissionServer.registerMessageEvent(this, "cn.chahuyun.doudizhu")
+        PermissionServer.registerMessageEvent(this, "cn.chahuyun.teafox.game")
 
         val scope = GlobalEventChannel.parentScope(this)
-        this@DouDiZhu.scope = scope
+        this@TeaFoxGames.scope = scope
         channel = scope.filterIsInstance(MessageEvent::class)
         scope.filterIsInstance(BotOnlineEvent::class).subscribeOnce<BotOnlineEvent> {
-            this@DouDiZhu.bot = it.bot
-            logger.info("斗地主bot已配置为${it.bot.nameCardOrNick}")
+            this@TeaFoxGames.bot = it.bot
+            logger.info("游戏机bot已配置为${it.bot.nameCardOrNick}")
         }
     }
 
 
     override fun onDisable() {
-        logger.debug("fox doudizhu 已卸载...")
+        logger.debug("TeaFoxGames 已卸载...")
     }
 
     fun info(msg: String) {
@@ -81,7 +81,7 @@ object DouDiZhu : KotlinPlugin(
         logger.error(msg)
     }
 
-    fun error(msg: String, e: Throwable?) {
+    fun error(msg: String?, e: Throwable?) {
         logger.error(msg, e)
     }
 

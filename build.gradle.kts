@@ -1,5 +1,3 @@
-import java.net.URI
-
 plugins {
     val kotlinVersion = "1.9.23"
     id("org.jetbrains.kotlin.jvm") version kotlinVersion
@@ -39,7 +37,7 @@ mirai {
 
 buildConfig {
     className("BuildConstants")
-    packageName("cn.chahuyun.doudizhu")
+    packageName("cn.chahuyun.teafox.game")
     useKotlinOutput()
     buildConfigField("String", "VERSION", "\"${project.version}\"")
     buildConfigField(

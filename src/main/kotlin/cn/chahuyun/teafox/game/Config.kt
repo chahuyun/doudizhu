@@ -1,4 +1,4 @@
-package cn.chahuyun.doudizhu
+package cn.chahuyun.teafox.game
 
 import cn.chahuyun.hibernateplus.DriveType
 import net.mamoe.mirai.console.data.AutoSavePluginConfig

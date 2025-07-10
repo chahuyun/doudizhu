@@ -1,4 +1,4 @@
-package cn.chahuyun.doudizhu.data
+package cn.chahuyun.teafox.game.data
 
 import cn.chahuyun.hibernateplus.HibernateFactory
 import jakarta.persistence.*

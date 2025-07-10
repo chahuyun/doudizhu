@@ -1,7 +1,8 @@
-package cn.chahuyun.doudizhu.game
+package cn.chahuyun.teafox.game.game
 
-import cn.chahuyun.doudizhu.GameType
-import cn.chahuyun.doudizhu.Player
+import cn.chahuyun.teafox.game.GameEvent
+import cn.chahuyun.teafox.game.GameType
+import cn.chahuyun.teafox.game.Player
 import net.mamoe.mirai.contact.Group
 
 
@@ -71,6 +72,15 @@ interface GameTable {
      * ->计算倍率，计算积分，操作结果
      */
     suspend fun stop()
+
+    /**
+     * 取消游戏
+     */
+    fun GameTable.cancelGame() {
+        GameEvent.cancelGame(group)
+    }
+
+
 }
 
 

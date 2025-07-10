@@ -1,6 +1,6 @@
-package cn.chahuyun.doudizhu
+package cn.chahuyun.teafox.game
 
-import cn.chahuyun.doudizhu.DouDiZhu.debug
+import cn.chahuyun.teafox.game.TeaFoxGames.debug
 import cn.chahuyun.hibernateplus.DriveType
 import cn.chahuyun.hibernateplus.HibernatePlusService
 
@@ -13,18 +13,18 @@ import cn.chahuyun.hibernateplus.HibernatePlusService
 object DataManager {
 
     fun init() {
-        val configuration = HibernatePlusService.createConfiguration(DouDiZhu::class.java)
+        val configuration = HibernatePlusService.createConfiguration(TeaFoxGames::class.java)
 
-        configuration.packageName = "cn.chahuyun.doudizhu.data"
+        configuration.packageName = "cn.chahuyun.teafox.game.data"
         when (DZDataConfig.dataType) {
             DriveType.H2 -> {
                 configuration.driveType = DriveType.H2
-                configuration.address = DouDiZhu.dataFolderPath.resolve("FoxDoudizhu.h2").toString()
+                configuration.address = TeaFoxGames.dataFolderPath.resolve("FoxDoudizhu.h2").toString()
             }
 
             DriveType.SQLITE -> {
                 configuration.driveType = DriveType.SQLITE
-                configuration.address = DouDiZhu.dataFolderPath.resolve("FoxDoudizhu").toString()
+                configuration.address = TeaFoxGames.dataFolderPath.resolve("FoxDoudizhu").toString()
             }
 
             DriveType.MYSQL -> {

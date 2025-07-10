@@ -1,14 +1,17 @@
-package cn.chahuyun.doudizhu.game
+package cn.chahuyun.teafox.game.game
 
-import cn.chahuyun.doudizhu.*
-import cn.chahuyun.doudizhu.Car.Companion.toListCards
-import cn.chahuyun.doudizhu.Cards.Companion.cardsShow
-import cn.chahuyun.doudizhu.Cards.Companion.show
-import cn.chahuyun.doudizhu.FoxUserManager.addLose
-import cn.chahuyun.doudizhu.FoxUserManager.addVictory
-import cn.chahuyun.doudizhu.game.CardFormUtil.check
-import cn.chahuyun.doudizhu.util.MessageUtil
-import cn.chahuyun.doudizhu.util.PlayerUtil
+import cn.chahuyun.teafox.game.*
+import cn.chahuyun.teafox.game.FoxUserManager.addLose
+import cn.chahuyun.teafox.game.FoxUserManager.addVictory
+import cn.chahuyun.teafox.game.game.CardFormUtil.check
+import cn.chahuyun.teafox.game.util.CardUtil.cardsShow
+import cn.chahuyun.teafox.game.util.CardUtil.show
+import cn.chahuyun.teafox.game.util.CardUtil.toListCards
+import cn.chahuyun.teafox.game.util.CardUtil.contains
+import cn.chahuyun.teafox.game.util.FriendUtil
+import cn.chahuyun.teafox.game.util.GameTableUtil.sendMessage
+import cn.chahuyun.teafox.game.util.MessageUtil.nextMessage
+import cn.chahuyun.teafox.game.util.MessageUtil.sendMessage
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -16,10 +19,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.MemberPermission
-import net.mamoe.mirai.event.events.MessageEvent
 import net.mamoe.mirai.message.data.At
-import net.mamoe.mirai.message.data.MessageChain
-import net.mamoe.mirai.message.data.PlainText
 import net.mamoe.mirai.message.data.buildMessageChain
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.floor
@@ -88,11 +88,10 @@ class DizhuGameTable(
             return
         }
 
-        sendMessage("游戏开始,请在2分钟内添加本bot的好友!")
-
         withTimeoutOrNull(120 * 1000L) {
-            val util = PlayerUtil(players)
+            val util = FriendUtil(players)
             if (util.check()) return@withTimeoutOrNull
+            else sendMessage("游戏开始,请在2分钟内添加本bot的好友!")
             if (util.listening()) return@withTimeoutOrNull
         } ?: run {
             players.forEach {
@@ -119,10 +118,8 @@ class DizhuGameTable(
                 players.map { player ->
                     async {
                         try {
-                            val nextMessage = MessageUtil.nextMessage(player, DZConfig.timeOut)
+                            val input = player.nextMessage(group, DZConfig.timeOut)?.contentToString()?.trim()
                                 ?: throw VotingTimeoutException()
-
-                            val input = nextMessage.message.contentToString().trim()
 
                             if (input.startsWith("掀桌")) {
                                 throw TableFlipException(player)
@@ -152,13 +149,14 @@ class DizhuGameTable(
             sendMessage("${e.player.name} 掀桌(╯‵□′)╯︵┻━┻")
             cancelGame()
             return
-        } catch (e: VotingTimeoutException) {
+        } catch (_: VotingTimeoutException) {
             sendMessage("配置超时,(╯‵□′)╯︵┻━┻")
             cancelGame()
             return
         } catch (e: Exception) {
             sendMessage("配置过程中发生错误，游戏取消")
             cancelGame()
+            TeaFoxGames.error(e.message, e)
             return
         }
 
@@ -223,13 +221,12 @@ class DizhuGameTable(
             if (round == 1) {
                 //第一轮
                 sendMessage(nextPlayer.id, "开始抢地主:(抢/抢地主)")
-                val nextMessage = MessageUtil.nextMessage(nextPlayer, DZConfig.timeOut) ?: run {
+                val content = nextPlayer.nextMessage(group, DZConfig.timeOut)?.contentToString() ?: run {
                     sendMessage("发送超时,(╯‵□′)╯︵┻━┻")
                     stopGame()
                     return
                 }
 
-                val content = nextMessage.message.contentToString()
                 if (content.matches(Regex("^q|抢|抢地主"))) {
                     landlord = nextPlayer
                     qiang[nextPlayer] = true
@@ -259,13 +256,11 @@ class DizhuGameTable(
             if (round == 2) {
                 if (qiang[nextPlayer]!!) {
                     sendMessage(nextPlayer.id, "开始角逐抢地主:(抢/抢地主)")
-                    val nextMessage = MessageUtil.nextMessage(nextPlayer, DZConfig.timeOut) ?: run {
+                    val content = nextPlayer.nextMessage(group, DZConfig.timeOut)?.contentToString() ?: run {
                         sendMessage("发送超时,(╯‵□′)╯︵┻━┻")
                         stopGame()
                         return
                     }
-
-                    val content = nextMessage.message.contentToString()
 
                     if (content.matches(Regex("^q|抢|抢地主"))) {
                         landlord = nextPlayer
@@ -375,12 +370,10 @@ class DizhuGameTable(
             val isFirst = maxPlayer == null || maxPlayer == player
             sendMessage(player, "请出牌!" + if (isFirst) "" else "或者过")
 
-            val nextMessage = player.nextMessage(DZConfig.timeOut) ?: run {
+            val content = player.nextMessage(DZConfig.timeOut)?.contentToString() ?: run {
                 abnormalEnd(player)
                 return
             }
-
-            val content = nextMessage.message.contentToString()
 
             // 处理"过"的情况
             if (!isFirst && content.matches(Regex("\\.{2,4}|go?|过|不要|要不起"))) {
@@ -581,43 +574,10 @@ class DizhuGameTable(
 
     //==游戏过程辅助私有方法
 
-    private suspend fun GameTable.sendMessage(msg: String) {
-        this.group.sendMessage(msg)
-    }
-
-    private suspend fun GameTable.sendMessage(msg: MessageChain) {
-        this.group.sendMessage(msg)
-    }
-
-    private suspend fun GameTable.sendMessage(id: Long, msg: String) {
-        this.group.sendMessage(At(id).plus(PlainText(msg)))
-    }
-
-    private suspend fun GameTable.sendMessage(player: Player, msg: String) {
-        this.group.sendMessage(At(player.id).plus(PlainText(msg)))
-    }
-
-    private suspend fun Player.sendMessage(msg: String) {
-        bot.getFriend(this.id)?.sendMessage(msg)
-    }
-
-    private fun GameTable.cancelGame() {
-        GameEvent.cancelGame(group)
-    }
 
     private suspend fun GameTable.stopGame() {
         players.forEach { group[it.id]?.modifyAdmin(false) }
         group.settings.isMuteAll = false
         cancelGame()
     }
-
-    /**
-     * 获取好友的下一条消息
-     */
-    suspend fun Player.nextMessage(): MessageEvent? = MessageUtil.nextMessage(this, 30)
-
-    /**
-     * 获取好友的下一条消息
-     */
-    suspend fun Player.nextMessage(timer: Int): MessageEvent? = MessageUtil.nextMessage(this, timer)
 }

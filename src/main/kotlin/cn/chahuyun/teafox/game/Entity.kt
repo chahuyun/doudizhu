@@ -1,8 +1,8 @@
-package cn.chahuyun.doudizhu
+package cn.chahuyun.teafox.game
 
-import cn.chahuyun.doudizhu.Car.Companion.sort
-import cn.chahuyun.doudizhu.Cards.Companion.show
-import cn.chahuyun.doudizhu.Cards.Companion.toListCar
+import cn.chahuyun.teafox.game.util.CardUtil.show
+import cn.chahuyun.teafox.game.util.CardUtil.toListCar
+
 
 /**
  * 对局
@@ -61,6 +61,7 @@ data class Game(
     /**
      * 手动设置下一个出牌人
      */
+    @Suppress("AssignedValueIsNeverRead")
     fun setNextPlayer(player: Player) {
         var index = players.indexOf(player)
         if (index >= 0) {
@@ -198,36 +199,6 @@ data class Cards(
             return createFullDeck().flatMap { cars -> List(cars.num) { cars.car } }.shuffled()
         }
 
-        /**
-         * 打印牌
-         */
-        @JvmName("showCar")
-        fun List<Car>.show(): String {
-            return sort().joinToString { "$it" }
-        }
-
-        /**
-         * 打印牌
-         */
-        @JvmName("showCars")
-        fun List<Cards>.show(): String {
-            return sort().flatMap { cards -> List(cards.num) { "${cards.car}" } }.joinToString()
-        }
-
-        /**
-         * 打印牌
-         */
-        @JvmName("cardsShow")
-        fun List<Cards>.cardsShow(): String {
-            return sort().reversed().flatMap { cards -> List(cards.num) { "${cards.car}" } }.joinToString()
-        }
-
-
-        // 添加扩展函数将List<Cards>转换为List<Car>
-        @JvmName("toListCar")
-        fun List<Cards>.toListCar(): List<Car> {
-            return flatMap { cards -> List(cards.num) { cards.car } }
-        }
 
     }
 }
@@ -266,60 +237,6 @@ enum class Car(
                 it.marking == normalized
             }
         }
-
-        /**
-         * 判断是否连续（允许乱序）
-         */
-        @JvmName("continuousCar")
-        fun continuous(cars: List<Car>): Boolean {
-            if (cars.size <= 1) return false
-
-            //链子中不能有大小王和2
-            if (cars.contains(SMALL_JOKER) || cars.contains(BIG_JOKER) || cars.contains(TWO)) {
-                return false
-            }
-
-            // 先根据 value 排序
-            val sorted = cars.sortedBy { it.value }
-
-            // 再检查是否连续
-            return sorted.zipWithNext().all { (car1, car2) ->
-                car2.value == car1.value + 1
-            }
-        }
-
-        /**
-         * 判断是否连续（允许乱序）
-         */
-        @JvmName("continuousCards")
-        fun continuous(cars: List<Cards>): Boolean {
-            return continuous(cars.map { it.car })
-        }
-
-        /**
-         * 按照斗地主的牌的大小进行排序
-         */
-        @JvmName("sortCar")
-        fun List<Car>.sort(): List<Car> {
-            return sortedByDescending { it.sort }
-        }
-
-        /**
-         * 按照斗地主的牌的大小进行排序
-         */
-        @JvmName("sortCards")
-        fun List<Cards>.sort(): List<Cards> {
-            return sortedByDescending { it.car.sort }
-        }
-
-
-        // 添加扩展函数将List<Car>转换为List<Cards>
-        @JvmName("toListCards")
-        fun List<Car>.toListCards(): List<Cards> {
-            return this.groupingBy { it }
-                .eachCount()
-                .map { (car, count) -> Cards(car, count) }
-        }
     }
 
     override fun toString(): String {
@@ -342,13 +259,13 @@ enum class GameTableCoinsType(
     NORMAL(10, 50, 100),
     BIG(50, 200, 400),
     HUGE(200, 1000, 2000),
-    PEAK(1000,3000,5000)
+    PEAK(1000, 3000, 5000)
 }
 
 /**
  * 游戏类型
  */
-enum class GameType{
+enum class GameType {
     /**
      * 斗地主
      */

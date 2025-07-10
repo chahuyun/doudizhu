@@ -1,4 +1,4 @@
-package cn.chahuyun.doudizhu.util
+package cn.chahuyun.teafox.game.util
 
 import net.mamoe.mirai.message.data.ForwardMessage
 import net.mamoe.mirai.message.data.RawForwardMessage
