@@ -356,12 +356,12 @@ class DizhuGameTable(
             }
 
             if (player.playCards(cards)) {
-                sendMessage(msg)
                 val handSize = player.hand.sumOf { it.num }
                 if (handSize in 1..3) {
-                    sendMessage("${player.name} 只剩 $handSize 张牌了!")
+                    msg.plus("\n${player.name} 只剩 $handSize 张牌了!")
                 }
 
+                sendMessage(msg)
                 maxPlayer = player
                 maxForm = match
                 maxCards = cards
