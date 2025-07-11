@@ -78,13 +78,13 @@ data class FoxUser(
     }
 
     /**
-     * 获取胜率，保留一位小数（例如：66.7）
+     * 获取胜率，返回格式如："66.7%"
      */
-    fun winRate(): Double {
+    fun winRate(): String {
         val total = (victory ?: 0) + (lose ?: 0)
-        if (total == 0) return 0.0
+        if (total == 0) return "0.0%"
         val rate = (victory ?: 0).toDouble() / total.toDouble() * 100
-        return String.format("%.1f%%", rate).toDouble()
+        return "%.1f%%".format(rate)
     }
 
     /**
