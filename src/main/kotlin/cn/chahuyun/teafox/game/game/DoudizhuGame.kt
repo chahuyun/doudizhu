@@ -4,9 +4,13 @@ import cn.chahuyun.teafox.game.*
 import cn.chahuyun.teafox.game.FoxUserManager.addLose
 import cn.chahuyun.teafox.game.FoxUserManager.addVictory
 import cn.chahuyun.teafox.game.game.CardFormUtil.check
-import cn.chahuyun.teafox.game.util.CardUtil.cardsShow
+import cn.chahuyun.teafox.game.util.CardUtil
+import cn.chahuyun.teafox.game.util.CardUtil.containsRank
+import cn.chahuyun.teafox.game.util.CardUtil.getRankSize
+import cn.chahuyun.teafox.game.util.CardUtil.knowCardRank
 import cn.chahuyun.teafox.game.util.CardUtil.show
-import cn.chahuyun.teafox.game.util.CardUtil.toListCards
+import cn.chahuyun.teafox.game.util.CardUtil.toCard
+import cn.chahuyun.teafox.game.util.CardUtil.toGroup
 import cn.chahuyun.teafox.game.util.FriendUtil
 import cn.chahuyun.teafox.game.util.GameTableUtil.sendMessage
 import cn.chahuyun.teafox.game.util.MessageUtil.nextMessage
@@ -48,7 +52,7 @@ class DizhuGameTable(
     /**
      * 牌库
      */
-    private val deck: List<Card> = CardRanks.createFullExpandDeck(),
+    private val deck: List<Card> = CardUtil.createFullExpandDeck(),
     /**
      * 默认对局类型
      */
@@ -288,12 +292,10 @@ class DizhuGameTable(
 
         bottomCards.forEach { landlord.addHand(it) }
 
-        if (bottomCards.toListCards().size == 1) {
+        if (bottomCards.getRankSize() == 1) {
             sendMessage("底牌是3连:${bottomCards.show()},翻倍!")
             game.fold *= 2
-        } else if (bottomCards.toListCards().contains(Car.BIG_JOKER) && bottomCards.toListCards()
-                .contains(Car.SMALL_JOKER)
-        ) {
+        } else if (bottomCards.containsRank(CardRank.SMALL_JOKER) && bottomCards.containsRank(CardRank.BIG_JOKER)) {
             sendMessage("底牌是王炸:${bottomCards.show()},翻倍!")
             game.fold *= 2
         } else {
@@ -324,7 +326,7 @@ class DizhuGameTable(
         // 比较的玩家
         var maxPlayer: Player? = null
         // 比较的手牌
-        var maxCards: List<CardRanks> = mutableListOf()
+        var maxCards: List<Card> = mutableListOf()
         // 比较的牌类型
         var maxForm: CardForm = CardForm.ERROR
         val win: Player
@@ -334,23 +336,23 @@ class DizhuGameTable(
         }
 
         // 提取出牌后的公共操作
-        suspend fun handlePlay(player: Player, cards: List<CardRanks>, match: CardForm, isFirst: Boolean) {
+        suspend fun handlePlay(player: Player, cards: List<Card>, match: CardForm, isFirst: Boolean) {
             val action = if (isFirst) "出牌" else "管上"
             var msg = when (match) {
-                CardForm.BOMB -> "${player.name} : 炸弹(翻倍)! ${cards.cardsShow()}"
-                CardForm.TRIPLE_ONE -> "${player.name} : 三带一! ${cards.cardsShow()}"
-                CardForm.TRIPLE_TWO -> "${player.name} : 三带二! ${cards.cardsShow()}"
-                CardForm.QUEUE -> "${player.name} : 顺子! ${cards.cardsShow()}"
+                CardForm.BOMB -> "${player.name} : 炸弹(翻倍)! ${cards.show()}"
+                CardForm.TRIPLE_ONE -> "${player.name} : 三带一! ${cards.show()}"
+                CardForm.TRIPLE_TWO -> "${player.name} : 三带二! ${cards.show()}"
+                CardForm.QUEUE -> "${player.name} : 顺子! ${cards.show()}"
                 CardForm.GHOST_BOMB -> "${player.name} : 王炸(翻倍)!!!"
-                CardForm.QUEUE_TWO -> "${player.name} : 连对! ${cards.cardsShow()}"
-                CardForm.AIRCRAFT -> "${player.name} : 飞机! ${cards.cardsShow()}"
-                CardForm.AIRCRAFT_SINGLE -> "${player.name} : 飞机! ${cards.cardsShow()}"
-                CardForm.AIRCRAFT_PAIR -> "${player.name} : 飞机! ${cards.cardsShow()}"
-                else -> "${player.name} : $action ${cards.cardsShow()}"
+                CardForm.QUEUE_TWO -> "${player.name} : 连对! ${cards.show()}"
+                CardForm.AIRCRAFT -> "${player.name} : 飞机! ${cards.show()}"
+                CardForm.AIRCRAFT_SINGLE -> "${player.name} : 飞机! ${cards.show()}"
+                CardForm.AIRCRAFT_PAIR -> "${player.name} : 飞机! ${cards.show()}"
+                else -> "${player.name} : $action ${cards.show()}"
             }
 
             if (player.playCards(cards)) {
-                val handSize = player.hand.sumOf { it.num }
+                val handSize = player.hand.size
                 if (handSize in 1..3) {
                     msg = msg.plus("\n${player.name} 只剩 $handSize 张牌了!")
                 }
@@ -388,13 +390,13 @@ class DizhuGameTable(
                     continue
                 }
 
-                if (!player.checkHand(listCar)) {
+                if (!player.canPlayCards(listCar)) {
                     sendMessage(player, "你现在的手牌无法这样出!")
                     continue
                 }
 
-                val cards = listCar.toListCards()
-                val match = CardFormUtil.match(cards)
+                val cards = listCar.toCard()
+                val match = CardFormUtil.match(cards.toGroup())
 
                 if (match == CardForm.ERROR) {
                     sendMessage(player, "你的出牌不符合规则,请重新出牌!")
@@ -521,7 +523,7 @@ class DizhuGameTable(
      * 解析扑克牌输入字符串
      * 支持格式：10、J、Q、K、A、大王、小王等
      */
-    private fun parseCardInput(input: String): List<Car> {
+    private fun parseCardInput(input: String): List<CardRank> {
         val cards = mutableListOf<String>()
         val regex = Regex("10|大王|小王|王炸|[2-9aAjJqQkK]|0")
         var remaining = input
@@ -533,7 +535,7 @@ class DizhuGameTable(
 
             val card = match.value
             if (card == "王炸") {
-                return listOf(Car.BIG_JOKER, Car.SMALL_JOKER)
+                return listOf(CardRank.BIG_JOKER, CardRank.SMALL_JOKER)
             }
             cards.add(
                 when (card) {
@@ -545,14 +547,19 @@ class DizhuGameTable(
             remaining = remaining.substring(card.length)
         }
 
-        return cards.map { Car.fromMarking(it)!! }
+        return cards.map { knowCardRank(it) }
     }
 
     /**
      * 检查吃不吃的起
      * @return true 吃的起
      */
-    private fun checkEat(maxForm: CardForm, nowForm: CardForm, maxCards: List<CardRanks>, nowCards: List<CardRanks>): Boolean {
+    private fun checkEat(
+        maxForm: CardForm,
+        nowForm: CardForm,
+        maxCards: List<Card>,
+        nowCards: List<Card>
+    ): Boolean {
         //先判断炸弹
         when (maxForm.value) {
             2 -> if (nowForm.value == 1) return false
