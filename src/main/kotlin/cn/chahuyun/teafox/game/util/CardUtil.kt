@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 package cn.chahuyun.teafox.game.util
 
 import cn.chahuyun.teafox.game.*
@@ -12,16 +14,27 @@ object CardUtil {
     /**
      * 打印牌
      */
-    fun List<Card>.show(): String {
-        return sortRank().joinToString { if (it.color == CardColor.NO_FIT) it.toShow() else "$it" }
+    fun List<Card>.show(showColor: Boolean = false): String {
+        return sortRank().joinToString {
+            if (showColor && it.color != CardColor.NO_FIT) {
+                it.toString() // 带颜色输出
+            } else {
+                it.toShow() // 不带颜色输出
+            }
+        }
     }
-
 
     /**
      * 反方向打印牌
      */
-    fun List<Card>.showDesc(): String {
-        return sortRank().reversed().joinToString { if (it.color == CardColor.NO_FIT) it.toShow() else "$it" }
+    fun List<Card>.showDesc(showColor: Boolean = false): String {
+        return sortRank().asReversed().joinToString {
+            if (showColor && it.color != CardColor.NO_FIT) {
+                it.toString()
+            } else {
+                it.toShow()
+            }
+        }
     }
 
     // == 转换 ==
@@ -55,13 +68,13 @@ object CardUtil {
      * 按照斗地主的牌的大小进行排序
      */
     @JvmName("sortRankCard")
-    fun List<Card>.sortRank(): List<Card> = sortedBy { it.rank.sort }
+    fun List<Card>.sortRank(): List<Card> = sortedByDescending { it.rank.sort }
 
     /**
      * 按照斗地主的牌大小进行排序
      */
     @JvmName("sortRankCardGroup")
-    fun List<CardGroup>.sortRank() = sortedBy { it.rank.sort }
+    fun List<CardGroup>.sortRank() = sortedByDescending { it.rank.sort }
 
     /**
      * 排序,数量多的在前
@@ -91,7 +104,7 @@ object CardUtil {
      * 牌值转换
      * 通过字符串识别排值
      */
-    fun knowCardRank(str: String): CardRank = when (str) {
+    fun knowCardRank(str: String): CardRank = when (str.uppercase()) {
         "4" -> CardRank.FOUR
         "5" -> CardRank.FIVE
         "6" -> CardRank.SIX
