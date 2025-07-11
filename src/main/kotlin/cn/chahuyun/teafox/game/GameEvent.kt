@@ -150,6 +150,11 @@ class GameEvent {
         } else {
             gameTables[group.id] = DizhuGameTable(group, listOf(), event.bot)
         }
+        val player = Player(sender.id, sender.nameCardOrNick)
+
+        if (!checkPlayerInGame(player, group)) {
+            group.sendMessage("${player.name} 你已加入其他游戏桌，请勿重复加入")
+        }
 
         val action = when (type) {
             GameTableCoinsType.NORMAL -> "普通"
@@ -158,10 +163,10 @@ class GameEvent {
             else -> "巅峰"
         }
 
-        group.sendMessage("${sender.nick} 开启了一桌 $action 对局游戏，快快发送 加入对局|来 加入对局进行游戏吧!")
+        group.sendMessage("${player.name} 开启了一桌 $action 对局游戏，快快发送 加入对局|来 加入对局进行游戏吧!")
 
         // 使用可变列表来添加玩家
-        val players = mutableListOf(Player(sender.id, sender.nameCardOrNick))
+        val players = mutableListOf(player)
 
         debug("等待加入游戏!")
         while (players.size < 3) {
@@ -222,7 +227,7 @@ class GameEvent {
      * @return true 不在
      */
     private fun checkPlayerInGame(player: Player, group: Group): Boolean {
-        return if (gameTables.size == 1) {
+        return if (gameTables.size == 1 && gameTables.containsKey(group.id)) {
             true
         } else {
             !gameTables.filter { it.key != group.id }.any { player in it.value.players }
