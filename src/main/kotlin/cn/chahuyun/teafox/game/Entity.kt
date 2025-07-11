@@ -133,90 +133,13 @@ data class Player(
 }
 
 /**
- * 手牌
+ * 牌组
  */
-data class CardRanks(
-    /**
-     * 牌
-     */
-    val car: Card,
-    /**
-     * 数量
-     */
-    var num: Int = 1,
-) {
-    companion object {
-        /**
-         * 创建一副无花色的牌
-         */
-        @JvmStatic
-        fun createFullDeck(): List<CardRanks> {
-            return listOf(
-                CardRanks(Card(CardRank.ACE, CardColor.HEARTS), 4),
-                CardRanks(Card(CardRank.TWO, CardColor.HEARTS), 4),
-                CardRanks(Card(CardRank.THREE, CardColor.HEARTS), 4),
-                CardRanks(Card(CardRank.FOUR, CardColor.HEARTS), 4),
-                CardRanks(Card(CardRank.FIVE, CardColor.HEARTS), 4),
-                CardRanks(Card(CardRank.SIX, CardColor.HEARTS), 4),
-                CardRanks(Card(CardRank.SEVEN, CardColor.HEARTS), 4),
-                CardRanks(Card(CardRank.EIGHT, CardColor.HEARTS), 4),
-                CardRanks(Card(CardRank.NINE, CardColor.HEARTS), 4),
-                CardRanks(Card(CardRank.TEN, CardColor.HEARTS), 4),
-                CardRanks(Card(CardRank.JACK, CardColor.HEARTS), 4),
-                CardRanks(Card(CardRank.QUEEN, CardColor.HEARTS), 4),
-                CardRanks(Card(CardRank.KING, CardColor.HEARTS), 4),
-                CardRanks(Card(CardRank.SMALL_JOKER, CardColor.HEARTS), 1),
-                CardRanks(Card(CardRank.BIG_JOKER, CardColor.HEARTS), 1)
-            )
-        }
-
-        /**
-         * 创建一副无花色的牌
-         */
-        @JvmStatic
-        fun createFullFourColorDeck(): List<CardRanks> {
-            return listOf(
-                createFourColorDeck(CardRank.ACE),
-                createFourColorDeck(CardRank.TWO),
-                createFourColorDeck(CardRank.THREE),
-                createFourColorDeck(CardRank.FOUR),
-                createFourColorDeck(CardRank.FIVE),
-                createFourColorDeck(CardRank.SIX),
-                createFourColorDeck(CardRank.SEVEN),
-                createFourColorDeck(CardRank.EIGHT),
-                createFourColorDeck(CardRank.NINE),
-                createFourColorDeck(CardRank.TEN),
-                createFourColorDeck(CardRank.JACK),
-                createFourColorDeck(CardRank.QUEEN),
-                createFourColorDeck(CardRank.KING),
-                CardRanks(Card(CardRank.SMALL_JOKER, CardColor.HEARTS), 1),
-                CardRanks(Card(CardRank.BIG_JOKER, CardColor.HEARTS), 1)
-            )
-        }
-
-        /**
-         * 创建一副随机打乱展开的牌
-         */
-        @JvmStatic
-        fun createFullExpandDeck(): List<Card> {
-            return createFullDeck().flatMap { cars -> List(cars.num) { cars.car } }.shuffled()
-        }
-
-        /**
-         * 创建四色牌
-         */
-        @JvmStatic
-        fun createFourColorDeck(rank: CardRank): List<Card> {
-            return listOf(
-                Card(rank, CardColor.HEARTS),
-                Card(rank, CardColor.SPADES),
-                Card(rank, CardColor.DIAMONDS),
-                Card(rank, CardColor.CLUBS)
-            )
-        }
-    }
-}
-
+data class CardGroup(
+    val rank: CardRank,
+    val num:Int,
+    val cards:List<Card>
+)
 
 /**
  * 单张牌
@@ -238,11 +161,21 @@ data class Card(
         }
     }
 
+    /**
+     * 打印，默认携带花色
+     */
     override fun toString(): String {
         return when (rank) {
             CardRank.SMALL_JOKER, CardRank.BIG_JOKER -> "[${rank.display}]"
             else -> "[${color.symbol}${rank.display}]"
         }
+    }
+
+    /**
+     * 打印，不带花色
+     */
+    fun toShow():String {
+        return "[${rank.display}]"
     }
 }
 

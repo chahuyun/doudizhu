@@ -1,8 +1,6 @@
 package cn.chahuyun.teafox.game.util
 
-import cn.chahuyun.teafox.game.Car
-import cn.chahuyun.teafox.game.Car.*
-import cn.chahuyun.teafox.game.CardRanks
+import cn.chahuyun.teafox.game.*
 
 /**
  * 游戏牌工具
@@ -14,46 +12,35 @@ object CardUtil {
     /**
      * 打印牌
      */
-    @JvmName("showCar")
-    fun List<Car>.show(): String {
+    fun List<Card>.show(): String {
         return sort().joinToString { "$it" }
     }
 
-    /**
-     * 打印牌
-     */
-    @JvmName("showCars")
-    fun List<CardRanks>.show(): String {
-        return sort().flatMap { cards -> List(cards.num) { "${cards.car}" } }.joinToString()
-    }
 
     /**
      * 反方向打印牌
      */
-    @JvmName("cardsShow")
-    fun List<CardRanks>.cardsShow(): String {
-        return sort().reversed().flatMap { cards -> List(cards.num) { "${cards.car}" } }.joinToString()
+    fun List<Card>.showDesc(): String {
+        return sort().reversed().joinToString { "$it" }
     }
 
     // == 转换 ==
 
     /**
-     * 将List<Cards>转换为List<Car>
+     * 转换为牌组
      */
-    @JvmName("toListCar")
-    fun List<CardRanks>.toListCar(): List<Car> {
-        return flatMap { cards -> List(cards.num) { cards.car } }
+    fun List<Card>.toGroup(): List<CardGroup> {
+        return groupBy { it.rank }
+            .map { (rank, cards) -> CardGroup(rank, cards.size, cards) }
     }
 
     /**
-     * 将List<Car>转换为List<Cards>
+     * 牌组转换为牌
      */
-    @JvmName("toListCards")
-    fun List<Car>.toListCards(): List<CardRanks> {
-        return this.groupingBy { it }
-            .eachCount()
-            .map { (car, count) -> CardRanks(car, count) }
+    fun List<CardGroup>.toCard(): List<Card> {
+        return flatMap { it.cards }
     }
+
 
     // == 排序 ==
 
@@ -61,59 +48,106 @@ object CardUtil {
      * 按照斗地主的牌的大小进行排序
      */
     @JvmName("sortCar")
-    fun List<Car>.sort(): List<Car> {
-        return sortedByDescending { it.sort }
-    }
-
-    /**
-     * 按照斗地主的牌的大小进行排序
-     */
-    @JvmName("sortCards")
-    fun List<CardRanks>.sort(): List<CardRanks> {
-        return sortedByDescending { it.car.sort }
+    fun List<Card>.sort(): List<Card> {
+        return sortedByDescending { it.rank.sort }
     }
 
     /**
      * 排序,数量多的在前
      */
-    fun List<CardRanks>.sortNum(): List<CardRanks> = sortedByDescending { it.num }
+    @JvmName("sortNumCard")
+    fun List<Card>.sortNum(): List<CardGroup> = toGroup().sortedByDescending { it.num }
+
+    @JvmName("sortNumCardGroup")
+    fun List<CardGroup>.sortNum(): List<CardGroup> = sortedByDescending { it.num }
 
     // == 其他工具 ==
 
     /**
      * 匹配牌
      */
-    fun List<CardRanks>.contains(car: Car): Boolean = any { it.car == car }
+    @JvmName("containsRankFormCard")
+    fun List<Card>.containsRank(car: Card): Boolean = any { it.rank == car.rank }
+
+    @JvmName("containsRankFormRank")
+    fun List<Card>.containsRank(rank: CardRank): Boolean = any { it.rank == rank }
+
+    @JvmName("containsGroupRankFormCard")
+    fun List<CardGroup>.containsRank(car: Card): Boolean = any { it.rank == car.rank }
+
+    @JvmName("containsGroupRankFormRank")
+    fun List<CardGroup>.containsRank(rank: CardRank): Boolean = any { it.rank == rank }
 
 
     /**
      * 判断是否连续（允许乱序）
-     * 排除2大小王
+     * 全局排除大小王
+     * 排除2（仅限斗地主）
+     *
+     * @param type GameType 游戏类型
      */
-    @JvmName("continuousCards")
-    fun continuous(cars: List<CardRanks>): Boolean {
-        return continuous(cars.map { it.car })
+    @JvmName("continuousCar")
+    fun List<Card>.continuous(type: GameType = GameType.DIZHU): Boolean {
+        return toGroup().continuous(type)
     }
 
     /**
      * 判断是否连续（允许乱序）
-     * 排除2大小王
+     * 全局排除大小王
+     * 排除2（仅限斗地主）
+     *
+     * @param type GameType 游戏类型
      */
-    @JvmName("continuousCar")
-    fun continuous(cars: List<Car>): Boolean {
-        if (cars.size <= 1) return false
+    @JvmName("continuousCarGroup")
+    fun List<CardGroup>.continuous(type: GameType = GameType.DIZHU): Boolean {
+        if (size <= 1) return false
 
         //链子中不能有大小王和2
-        if (cars.contains(SMALL_JOKER) || cars.contains(BIG_JOKER) || cars.contains(TWO)) {
+        if (containsRank(CardRank.SMALL_JOKER) || containsRank(CardRank.BIG_JOKER)) {
             return false
         }
 
+        when (type) {
+            GameType.DIZHU -> if (containsRank(CardRank.TWO)) return false
+        }
+
+
         // 先根据 value 排序
-        val sorted = cars.sortedBy { it.value }
+        val sorted = sortedBy { it.rank.sort }
 
         // 再检查是否连续
         return sorted.zipWithNext().all { (car1, car2) ->
-            car2.value == car1.value + 1
+            car2.rank.value == car1.rank.value + 1
         }
     }
+
+
+    /**
+     * 创建一副随机打乱展开的牌
+     */
+    @JvmStatic
+    fun createFullExpandDeck(): List<Card> {
+        val cards = ArrayList<Card>(54)
+        for (rank in CardRank.entries) {
+            when (rank) {
+                CardRank.SMALL_JOKER -> cards.add(Card(rank, CardColor.BLACK_JOKER))
+                CardRank.BIG_JOKER -> cards.add(Card(rank, CardColor.RED_JOKER))
+                else -> cards.addAll(fourColor(rank))
+            }
+        }
+        return cards.shuffled()
+    }
+
+    /**
+     * 创建牌辅助工具：创建四色牌
+     */
+    private fun fourColor(rank: CardRank): List<Card> {
+        return listOf(
+            Card(rank, CardColor.SPADES),
+            Card(rank, CardColor.HEARTS),
+            Card(rank, CardColor.CLUBS),
+            Card(rank, CardColor.DIAMONDS)
+        )
+    }
+
 }

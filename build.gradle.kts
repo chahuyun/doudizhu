@@ -12,7 +12,8 @@ group = "cn.chahuyun"
 version = "1.0.0"
 
 repositories {
-    mavenCentral()
+    maven("https://nexus.jsdu.cn/repository/maven-public/")
+//    mavenCentral()
 }
 
 dependencies {
