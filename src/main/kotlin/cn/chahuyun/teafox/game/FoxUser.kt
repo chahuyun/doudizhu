@@ -44,6 +44,8 @@ object FoxUserManager {
             coins = 0
             victory = 0
             lose = 0
+            landlordVictory = 0
+            landlordLose = 0
         }
 
         HibernateFactory.merge(user)
