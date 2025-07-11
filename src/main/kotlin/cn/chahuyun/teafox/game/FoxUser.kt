@@ -60,20 +60,37 @@ object FoxUserManager {
     /**
      * 添加胜利,同时添加分数
      * @param score 分数
+     * @param isLandlord 是否是地主
      */
-    fun FoxUser.addVictory(score: Int) {
-        this.coins = this.coins?.plus(score)
-        this.victory = this.victory?.plus(1)
+    fun FoxUser.addVictory(score: Int, isLandlord: Boolean = false) {
+        // 增加总金币和胜利次数
+        this.coins = (this.coins ?: 0) + score
+        this.victory = (this.victory ?: 0) + 1
+
+        // 如果是地主，才增加地主胜利次数
+        if (isLandlord) {
+            this.landlordVictory = (this.landlordVictory ?: 0) + 1
+        }
+
         HibernateFactory.merge(this)
     }
 
     /**
      * 添加失败,同时减少分数
      * @param score 分数
+     * @param isLandlord 是否是地主
      */
-    fun FoxUser.addLose(score: Int) {
-        this.coins = this.coins?.minus(score)
-        this.lose = this.lose?.plus(1)
+    fun FoxUser.addLose(score: Int, isLandlord: Boolean = false) {
+        // 减少金币
+        this.coins = (this.coins ?: 0) - score
+        // 增加总失败次数
+        this.lose = (this.lose ?: 0) + 1
+
+        // 如果是地主，才增加地主失败次数
+        if (isLandlord) {
+            this.landlordLose = (this.landlordLose ?: 0) + 1
+        }
+
         HibernateFactory.merge(this)
     }
 

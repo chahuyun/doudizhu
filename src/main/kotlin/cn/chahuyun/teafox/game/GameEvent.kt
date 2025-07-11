@@ -70,13 +70,11 @@ class GameEvent {
 
         var no = 1
         val message = event.buildForwardMessage(
-            titleGenerator = "群聊的聊天记录",
-            previewGenerator = listOf(
+            titleGenerator = "群聊的聊天记录", previewGenerator = listOf(
                 "${DZConfig.botName}:分享一个炸裂的瓜!",
                 "${DZConfig.botName}:[图片]",
                 "${sender.nameCardOrNick}:卧槽,这是真的吗?"
-            ),
-            summarySize = 11
+            ), summarySize = 11
         ) {
             bot named DZConfig.botName says "以下是胜率排行榜↓:"
             list.forEach {
@@ -84,7 +82,10 @@ class GameEvent {
                     No.${no++}
                     用户名:${it.name}
                     狐币:${it.coins}
-                    胜率:${it.winRate()}%
+                    积分:${it.integral()}
+                    胜率:${it.winRate()}
+                    地主胜率:${it.landlordWinRate()}
+                    农民胜率:${it.farmerWinRate()}
                     总场次:${it.victory!! + it.lose!!}
                 """.trimIndent()
             }
@@ -105,13 +106,11 @@ class GameEvent {
 
         var no = 1
         val message = event.buildForwardMessage(
-            titleGenerator = "群聊的聊天记录",
-            previewGenerator = listOf(
+            titleGenerator = "群聊的聊天记录", previewGenerator = listOf(
                 "${sender.nameCardOrNick}:给兄弟们来点豪堪的!",
                 "${sender.nameCardOrNick}:[图片]",
                 "${sender.nameCardOrNick}:[图片]",
-            ),
-            summarySize = 11
+            ), summarySize = 11
         ) {
             bot named DZConfig.botName says "以下是狐币排行榜↓:"
             list.forEach {
@@ -119,7 +118,10 @@ class GameEvent {
                     No.${no++}
                     用户名:${it.name}
                     狐币:${it.coins}
-                    胜率:${it.winRate()}%
+                    积分:${it.integral()}
+                    胜率:${it.winRate()}
+                    地主胜率:${it.landlordWinRate()}
+                    农民胜率:${it.farmerWinRate()}
                     总场次:${it.victory!! + it.lose!!}
                 """.trimIndent()
             }
@@ -128,6 +130,39 @@ class GameEvent {
         event.subject.sendMessage(message)
     }
 
+    @MessageAuthorize(text = ["积分榜"])
+    suspend fun viewIntegral(event: GroupMessageEvent) {
+        val list = HibernateFactory.selectListByHql(
+            FoxUser::class.java, "FROM FoxUser ORDER BY (landlordVictory - landlordLose) + (victory - lose) DESC limit 10", mutableMapOf()
+        ).filter { (it.victory ?: 0) + (it.lose ?: 0) >= 5 }
+        val bot = event.bot
+        val sender = event.sender
+
+        var no = 1
+        val message = event.buildForwardMessage(
+            titleGenerator = "群聊的聊天记录", previewGenerator = listOf(
+                "${sender.nameCardOrNick}:[图片]",
+                "${sender.nameCardOrNick}:[图片]",
+                "${DZConfig.botName}:你简直是甜菜!!!",
+            ), summarySize = 11
+        ) {
+            bot named DZConfig.botName says "以下是积分排行榜↓:"
+            list.forEach {
+                it.uid!! named it.name!! says """
+                    No.${no++}
+                    用户名:${it.name}
+                    狐币:${it.coins}
+                    积分:${it.integral()}
+                    胜率:${it.winRate()}
+                    地主胜率:${it.landlordWinRate()}
+                    农民胜率:${it.farmerWinRate()}
+                    总场次:${it.victory!! + it.lose!!}
+                """.trimIndent()
+            }
+        }
+
+        event.subject.sendMessage(message)
+    }
 
     //=辅助私有方法
 

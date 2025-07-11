@@ -219,7 +219,7 @@ class DizhuGameTable(
         // 记录每位玩家是否曾经抢过地主
         val qiang = players.associateWith { false }.toMutableMap()
         var round = 1
-        var timer = Random.nextInt(0,3)
+        var timer = Random.nextInt(0, 3)
         while (true) {
             nextPlayer = players[timer % 3]
             if (round == 1) {
@@ -467,9 +467,9 @@ class DizhuGameTable(
 
         if (winPlayer.size == 1) {
             sendMessage("$winName 是赢家! 获得狐币: $integral !")
-            FoxUserManager.getFoxUser(winPlayer.first()).addVictory(integral)
             require(losePlayer.size == 2)
             val (p1, p2) = losePlayer
+            FoxUserManager.getFoxUser(winPlayer.first()).addVictory(integral, true)
             FoxUserManager.getFoxUser(p1).addLose(resutl + surplus)
             FoxUserManager.getFoxUser(p2).addLose(resutl)
         } else {
@@ -478,9 +478,8 @@ class DizhuGameTable(
             val (p1, p2) = winPlayer
             FoxUserManager.getFoxUser(p1).addVictory(resutl + surplus)
             FoxUserManager.getFoxUser(p2).addVictory(resutl)
-            FoxUserManager.getFoxUser(losePlayer.first()).addLose(integral)
+            FoxUserManager.getFoxUser(losePlayer.first()).addLose(integral, true)
         }
-
 
         stopGame()
         sendMessage("游戏结束!")
@@ -495,19 +494,40 @@ class DizhuGameTable(
         val totalCoins = game.bottom
         val validPlayers = players.filter { it != player }
 
-        // 确保只有两个人
         require(validPlayers.size == 2) { "异常：应该有且仅有两个其他玩家！" }
 
-        // 计算每人分多少金币（整除）
         val (p1, p2) = validPlayers
         val half = totalCoins / 2
-        val remainder = totalCoins % 2  // 如果是奇数，剩一个金币
+        val remainder = totalCoins % 2
 
-        // 扣掉超时玩家的金币
-        FoxUserManager.getFoxUser(player).minusCoins(totalCoins)
-        // 公平分配：一个人拿 half + remainder，另一个人拿 half
-        FoxUserManager.getFoxUser(p1).addCoins(half + remainder)
-        FoxUserManager.getFoxUser(p2).addCoins(half)
+        val p1User = FoxUserManager.getFoxUser(p1)
+        val p2User = FoxUserManager.getFoxUser(p2)
+
+        // 扣除超时玩家金币并分配
+        val timeoutUser = FoxUserManager.getFoxUser(player)
+        timeoutUser.minusCoins(totalCoins)
+        p1User.addCoins(half + remainder)
+        p2User.addCoins(half)
+
+        // 胜负判定
+        if (game.landlord == player) {
+            // 超时的是地主 → 农民胜利
+            timeoutUser.addLose(0, true)
+            p1User.addVictory(0)
+            p2User.addVictory(0)
+        } else {
+            // 超时的是农民 → 地主胜利
+            timeoutUser.addLose(0)
+
+            val landlordPlayer = validPlayers.find { it == game.landlord }!!
+            val otherPlayer = validPlayers.find { it != landlordPlayer }!!
+
+            val landlordUser = FoxUserManager.getFoxUser(landlordPlayer)
+            val otherUser = FoxUserManager.getFoxUser(otherPlayer)
+
+            landlordUser.addVictory(0, true)
+            otherUser.addLose(0)
+        }
 
         sendMessage(
             """

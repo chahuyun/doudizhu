@@ -34,6 +34,14 @@ data class FoxUser(
      * 玩家失败次数
      */
     var lose: Int? = null,
+    /**
+     * 地主胜利次数
+     */
+    var landlordVictory: Int? = null,
+    /**
+     * 地主失败次数
+     */
+    var landlordLose: Int? = null,
 
 
     /**
@@ -58,13 +66,57 @@ data class FoxUser(
     var foxGame: FoxGameAuxiliary? = null,
 ) {
     /**
+     * 获取积分
+     */
+    fun integral(): Int {
+        val lw = landlordVictory ?: 0
+        val ll = landlordLose ?: 0
+        val w = victory ?: 0
+        val l = lose ?: 0
+
+        return (lw - ll) + (w - l)
+    }
+
+    /**
      * 获取胜率，保留一位小数（例如：66.7）
      */
     fun winRate(): Double {
         val total = (victory ?: 0) + (lose ?: 0)
         if (total == 0) return 0.0
         val rate = (victory ?: 0).toDouble() / total.toDouble() * 100
-        return String.format("%.1f", rate).toDouble()
+        return String.format("%.1f%%", rate).toDouble()
+    }
+
+    /**
+     * 获取地主胜率，返回格式如 "66.7%"
+     */
+    fun landlordWinRate(): String {
+        val lw = landlordVictory ?: 0
+        val ll = landlordLose ?: 0
+        val total = lw + ll
+        if (total == 0) return "0.0%"
+
+        val rate = lw.toDouble() / total.toDouble() * 100
+        return String.format("%.1f%%", rate)
+    }
+
+    /**
+     * 获取农民胜率，返回格式如 "66.7%"
+     */
+    fun farmerWinRate(): String {
+        val lw = landlordVictory ?: 0
+        val ll = landlordLose ?: 0
+        val w = victory ?: 0
+        val l = lose ?: 0
+
+        val farmerWin = w - lw
+        val farmerLose = l - ll
+        val total = farmerWin + farmerLose
+
+        if (total == 0) return "0.0%"
+
+        val rate = farmerWin.toDouble() / total.toDouble() * 100
+        return String.format("%.1f%%", rate)
     }
 
     /**
