@@ -2,6 +2,8 @@ package cn.chahuyun.teafox.game.util
 
 import cn.chahuyun.teafox.game.Card
 import cn.chahuyun.teafox.game.CardRank
+import cn.chahuyun.teafox.game.util.CardUtil.get
+import cn.chahuyun.teafox.game.util.CardUtil.toGroup
 
 /**
  * 牌面值工具
@@ -18,11 +20,8 @@ object RankUtils {
      * 检查是否可以出牌（基于牌面值）
      */
     fun canPlayCards(hand: List<Card>, toPlay: List<Card>): Boolean {
-        val handRanks = hand.groupingBy { it.rank }.eachCount()
-        val playRanks = toPlay.groupingBy { it.rank }.eachCount()
-
-        return playRanks.all { (rank, count) ->
-            (handRanks[rank] ?: 0) >= count
+        return toPlay.toGroup().all { it->
+            (hand.toGroup().get(it)?.num ?: 0) >= it.num
         }
     }
 
