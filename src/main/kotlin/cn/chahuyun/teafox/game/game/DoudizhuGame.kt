@@ -27,6 +27,7 @@ import net.mamoe.mirai.message.data.buildMessageChain
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.floor
 import kotlin.math.roundToInt
+import kotlin.random.Random
 
 /**
  * 游戏桌
@@ -218,7 +219,7 @@ class DizhuGameTable(
         // 记录每位玩家是否曾经抢过地主
         val qiang = players.associateWith { false }.toMutableMap()
         var round = 1
-        var timer = 0
+        var timer = Random.nextInt(0,3)
         while (true) {
             nextPlayer = players[timer % 3]
             if (round == 1) {
