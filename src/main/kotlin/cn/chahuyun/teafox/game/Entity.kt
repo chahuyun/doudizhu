@@ -113,9 +113,26 @@ data class Player(
 
     /**
      * 检查是否可以出牌
+     * @param cards 要出的牌
+     * @param ignoreColor 是否忽略花色
+     * @return true 可以出牌
      */
-    fun canPlayCards(cards: List<Card>) =
-        RankUtils.canPlayCards(hand, cards)
+    fun canPlayCards(cards: List<Card>,ignoreColor: Boolean = true) : Boolean{
+        return if (ignoreColor){
+            RankUtils.canPlayCards(hand, cards)
+        }else{
+            cards.all { it-> hand.contains(it) }
+        }
+    }
+
+    /**
+     * 检查是否可以出牌
+     * @param cards 要出的牌
+     * @return true 可以出牌
+     */
+    fun canPlayCards(cards: List<CardRank>) : Boolean{
+        return canPlayCards(cards.map { Card(it, CardColor.NO_FIT) })
+    }
 
     /**
      * 出牌
@@ -212,7 +229,12 @@ enum class CardColor(val symbol: String, val value: Int, val color: Color) {
     /**
      * 黑王
      */
-    BLACK_JOKER("黑王", 6, BLACK)
+    BLACK_JOKER("黑王", 6, BLACK),
+
+    /**
+     * 无花色
+     */
+    NO_FIT("", 0, Color.WHITE)
 }
 
 /**
@@ -234,6 +256,8 @@ enum class CardRank(val value: Int, val display: String, val sort: Int) {
     TWO(15, "2", 13),
     SMALL_JOKER(16, "小王", 14),
     BIG_JOKER(17, "大王", 15)
+
+
 }
 
 /**
