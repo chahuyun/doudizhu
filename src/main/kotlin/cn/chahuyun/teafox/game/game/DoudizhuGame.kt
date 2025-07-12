@@ -219,9 +219,10 @@ class DizhuGameTable(
         // 记录每位玩家是否曾经抢过地主
         val qiang = players.associateWith { false }.toMutableMap()
         var round = 1
-        var timer = Random.nextInt(0, 3)
+        var timer = 0
+        val shuffledPlayers  = players.shuffled()
         while (true) {
-            nextPlayer = players[timer % 3]
+            nextPlayer = shuffledPlayers[timer % 3]
             if (round == 1) {
                 //第一轮
                 sendMessage(nextPlayer.id, "开始抢地主:(抢/抢地主)")
