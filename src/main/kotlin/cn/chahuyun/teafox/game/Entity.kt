@@ -283,5 +283,10 @@ enum class GameType {
     /**
      * 斗地主
      */
-    DIZHU
+    DIZHU,
+
+    /**
+     * 干瞪眼
+     */
+    GAND,
 }

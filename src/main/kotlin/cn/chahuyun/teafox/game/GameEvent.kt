@@ -9,6 +9,7 @@ import cn.chahuyun.teafox.game.TeaFoxGames.debug
 import cn.chahuyun.teafox.game.data.FoxUser
 import cn.chahuyun.teafox.game.game.DizhuGameTable
 import cn.chahuyun.teafox.game.game.GameTable
+import cn.chahuyun.teafox.game.game.GandGameTable
 import cn.chahuyun.teafox.game.util.MessageUtil.buildForwardMessage
 import cn.chahuyun.teafox.game.util.MessageUtil.nextGroupMessageEvent
 import net.mamoe.mirai.contact.Group
@@ -41,16 +42,19 @@ class GameEvent {
 
 
     @MessageAuthorize(text = ["开桌", "来一局"])
-    suspend fun startGameMin(event: GroupMessageEvent) = startGame(event, GameTableCoinsType.NORMAL)
+    suspend fun startGameMin(event: GroupMessageEvent) = startDoudizhuGame(event, GameTableCoinsType.NORMAL)
 
     @MessageAuthorize(text = ["开桌 大", "┳━┳", "来局大的", "来一局大的"])
-    suspend fun startGameMax(event: GroupMessageEvent) = startGame(event, GameTableCoinsType.BIG)
+    suspend fun startGameMax(event: GroupMessageEvent) = startDoudizhuGame(event, GameTableCoinsType.BIG)
 
     @MessageAuthorize(text = ["开桌 绝杀", "整一局绝杀局", "来父子局"])
-    suspend fun startGameHuge(event: GroupMessageEvent) = startGame(event, GameTableCoinsType.HUGE)
+    suspend fun startGameHuge(event: GroupMessageEvent) = startDoudizhuGame(event, GameTableCoinsType.HUGE)
 
     @MessageAuthorize(text = ["开桌 巅峰", "来巅峰局", "来癫疯局"])
-    suspend fun startGamePeak(event: GroupMessageEvent) = startGame(event, GameTableCoinsType.PEAK)
+    suspend fun startGamePeak(event: GroupMessageEvent) = startDoudizhuGame(event, GameTableCoinsType.PEAK)
+
+    @MessageAuthorize(text = ["开桌 干瞪眼", "来局干瞪眼"])
+    suspend fun startGGame(event: GroupMessageEvent) = startGandGame(event)
 
     @MessageAuthorize(text = ["我的狐币", "狐币"])
     suspend fun viewFoxCoins(event: GroupMessageEvent) {
@@ -133,7 +137,9 @@ class GameEvent {
     @MessageAuthorize(text = ["积分榜"])
     suspend fun viewIntegral(event: GroupMessageEvent) {
         val list = HibernateFactory.selectListByHql(
-            FoxUser::class.java, "FROM FoxUser ORDER BY (landlordVictory - landlordLose) + (victory - lose) DESC limit 10", mutableMapOf()
+            FoxUser::class.java,
+            "FROM FoxUser ORDER BY (landlordVictory - landlordLose) + (victory - lose) DESC limit 10",
+            mutableMapOf()
         ).filter { (it.victory ?: 0) + (it.lose ?: 0) >= 5 }
         val bot = event.bot
         val sender = event.sender
@@ -169,7 +175,7 @@ class GameEvent {
     /**
      * 开始游戏
      */
-    private suspend fun startGame(event: GroupMessageEvent, type: GameTableCoinsType) {
+    private suspend fun startDoudizhuGame(event: GroupMessageEvent, type: GameTableCoinsType) {
         val sender = event.sender
         val group = event.group
 
@@ -232,6 +238,70 @@ class GameEvent {
         }
 
         val gameTable = DizhuGameTable(group, players, event.bot, type = type)
+        gameTables[group.id] = gameTable
+        gameTable.start()
+    }
+
+    private suspend fun startGandGame(event: GroupMessageEvent) {
+        val sender = event.sender
+        val group = event.group
+
+        val type = GameTableCoinsType.HUGE
+        val foxUser = getFoxUser(sender)
+
+        if (foxUser.coins!! < type.guaranteed) {
+            if (!getFoxCoins(foxUser, event, type)) return
+        }
+
+        if (gameTables.containsKey(group.id)) {
+            group.sendMessage("游戏桌 ┳━┳ 已存在，请勿重复创建")
+            return
+        } else {
+            gameTables[group.id] = GandGameTable(group, listOf(), GameType.GAND)
+        }
+        val player = Player(sender.id, sender.nameCardOrNick)
+
+        if (!checkPlayerInGame(player, group)) {
+            group.sendMessage("${player.name} 你已加入其他游戏桌，请勿重复加入")
+        }
+
+        group.sendMessage("${player.name} 开启了一桌 干瞪眼 对局游戏，快快发送 加入对局|来 加入对局进行游戏吧!")
+
+        // 使用可变列表来添加玩家
+        val players = mutableListOf(player)
+
+        debug("等待加入游戏!")
+        while (players.size < 6) {
+            val messageEvent = nextGroupMessageEvent(group, DZConfig.timeOut) ?: run {
+                group.sendMessage("等待玩家加入超时，游戏未能开始(╯‵□′)╯︵┻━┻")
+                gameTables.remove(group.id)
+                return // 如果超时则退出
+            }
+
+            val content = messageEvent.message.contentToString()
+            if (content.matches("^加入|来".toRegex())) { // 检查消息内容是否为加入请求
+                val newPlayer = Player(messageEvent.sender.id, messageEvent.sender.nick)
+                val playerFoxUser = getFoxUser(newPlayer)
+
+                if (playerFoxUser.coins!! < type.guaranteed) {
+                    if (!getFoxCoins(playerFoxUser, messageEvent, type)) continue
+                }
+                // 防止重复加入
+                if (players.any { it.id == newPlayer.id } || !checkPlayerInGame(newPlayer, group)) continue
+
+                players.add(newPlayer)
+                group.sendMessage("${newPlayer.name} 加入了游戏！当前玩家：${players.joinToString(",") { it.name }}")
+            } else if (content.matches("^开始|开".toRegex())) {
+                group.sendMessage("当前玩家：${players.joinToString(",") { it.name }} 开始干瞪眼游戏!")
+                break
+            } else if (content.matches("^掀桌".toRegex())) {
+                group.sendMessage("掀桌(╯‵□′)╯︵┻━┻")
+                gameTables.remove(group.id)
+                return
+            }
+        }
+
+        val gameTable = GandGameTable(group, players, GameType.GAND)
         gameTables[group.id] = gameTable
         gameTable.start()
     }
