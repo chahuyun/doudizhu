@@ -2,16 +2,14 @@ package cn.chahuyun.teafox.game.game
 
 import cn.chahuyun.teafox.game.game.BaghChalGameCore.PosStatue.*
 
-
+/**
+ * 行数
+ * */
 const val rowSize = 5
 /**
  * 羊狼棋核心逻辑
  * */
 class BaghChalGameCore{
-    /**
-     * 行数
-     * */
-
     /**
      * 表示落子点位状态的值
      * */
@@ -42,15 +40,17 @@ class BaghChalGameCore{
      * true:羊*/
     private var term:Boolean = false
 
+    /**
+     * */
     init {
         vectorMap[0][0] = Wolf
         vectorMap[0][rowSize-1] = Wolf
         vectorMap[rowSize-1][0] = Wolf
         vectorMap[rowSize-1][rowSize-1] = Wolf
     }
+
     /**
-     * 刷新棋盘
-     * */
+     * 刷新棋盘 */
     fun fresh(){
         for (row in 0 until  rowSize){
             for (col in 0 until  rowSize){
@@ -64,6 +64,7 @@ class BaghChalGameCore{
         piecesLeft = 20
         piecesCaptured = 0
     }
+
     /**
      * 逻辑核心，玩家的移动|落子
      * @param sRow 源行坐标
@@ -87,6 +88,7 @@ class BaghChalGameCore{
         term = !term
         // 5、判断胜负
     }
+
     /**
      * 狼方执棋*/
     private fun wolfStep(sRow:Int,
@@ -117,6 +119,7 @@ class BaghChalGameCore{
 
         // 2.执行改变
     }
+
     /**
      * 羊方执棋*/
     private fun sheepStep(sRow:Int,
@@ -126,24 +129,29 @@ class BaghChalGameCore{
         // 1.检查移动合法性
         // 2.执行改变
     }
+
     /**
      * 检查坐标合法性*/
     private fun checkPos(row:Int,col:Int):Boolean{
         return (row in (0 until rowSize)) && (col in (0 until rowSize))
     }
+
     /**
      * 检查坐标合法性*/
     private fun checkPos(pos:Point):Boolean{
         return (pos.row in (0 until rowSize)) && (pos.col in (0 until rowSize))
     }
+
     /**
      * 获取点位值*/
     private fun getPosStatue(row: Int,col: Int):PosStatue{
         return vectorMap[row][col]
     }
+
     /**
      * 获取点位值*/
     private fun getPosStatue(pos:Point):PosStatue{
+
         return vectorMap[pos.row][pos.col]
     }
     /**
@@ -155,12 +163,14 @@ class BaghChalGameCore{
         vectorMap[tRow][tCol] = getPosStatue(sRow,sCol)
         vectorMap[sRow][sCol] = Empty
     }
+
     /**
      * 移动棋子，仅仅只是将棋子移动到目标点位，无视目标点位是否为空，在原点位置为空值*/
     private fun simpleMove(sPos:Point,tPos:Point){
         vectorMap[tPos.row][tPos.col] = getPosStatue(sPos.row,sPos.col)
         vectorMap[sPos.row][sPos.col] = Empty
     }
+
     /**
      * 落子，仅羊方玩家行为*/
     private fun place(tRow:Int,
@@ -168,12 +178,14 @@ class BaghChalGameCore{
         vectorMap[tRow][tCol] = Sheep
         piecesLeft -= 1
     }
+
     /**
      * 落子，仅羊方玩家行为*/
     private fun place(pos:Point){
         vectorMap[pos.row][pos.col] = Sheep
         piecesLeft -= 1
     }
+
     /**
      * 获取一个列表，代表传入点位可以移动的坐标*/
     fun getMoveablePoints(pos:Point):Array<Point>{

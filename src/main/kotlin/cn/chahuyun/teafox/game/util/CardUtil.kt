@@ -199,8 +199,8 @@ object CardUtil {
             return false
         }
 
-        when (type) {
-            GameType.DIZHU -> if (containsRank(CardRank.TWO)) return false
+        if (type == GameType.DIZHU) {
+            if (containsRank(CardRank.TWO)) return false
         }
 
 
