@@ -76,10 +76,34 @@ interface GameTable {
     /**
      * 取消游戏
      */
-    fun GameTable.cancelGame() {
+    fun cancelGame() {
         GameEvent.cancelGame(group)
     }
 
+    /**
+     * 获取下一个玩家
+     * @param currentPlayer 当前玩家
+     * @return 下一个玩家
+     */
+    fun nextPlayer(currentPlayer: Player? = null): Player {
+        if (players.isEmpty()) throw IllegalStateException("玩家列表为空")
+
+        val index = if (currentPlayer == null) -1 else players.indexOf(currentPlayer)
+        if (index != -1 && index !in players.indices) {
+            throw IllegalArgumentException("当前玩家不在玩家列表中")
+        }
+
+        // 如果没有当前玩家，从第一个开始
+        return players[(index + 1) % players.size]
+    }
+
+    /**
+     * 随机一个玩家
+     * @return 随机玩家
+     */
+    fun randomPlayer(): Player {
+        return players.random()
+    }
 
 }
 
