@@ -15,19 +15,75 @@ import cn.chahuyun.teafox.game.util.FriendUtil
 import cn.chahuyun.teafox.game.util.GameTableUtil.sendMessage
 import cn.chahuyun.teafox.game.util.MessageUtil.nextMessage
 import cn.chahuyun.teafox.game.util.MessageUtil.sendMessage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.MemberPermission
+import net.mamoe.mirai.event.Listener
+import net.mamoe.mirai.event.events.FriendMessageEvent
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.buildMessageChain
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.floor
 import kotlin.math.roundToInt
-import kotlin.random.Random
+
+/**
+ * 对局
+ */
+data class Game(
+    /**
+     * 玩家
+     */
+    val players: List<Player>,
+    /**
+     * 群
+     */
+    val group: Long,
+    /**
+     * 底分
+     */
+    val bottom: Int,
+    /**
+     * 倍数
+     */
+    var fold: Int,
+    /**
+     * 剩余牌数
+     */
+    var residual: Int = 54,
+    /**
+     * 当前轮到哪个玩家出牌（索引）
+     */
+    var currentPlayerIndex: Int = 0,
+    /**
+     * 赢家
+     */
+    var winPlayer: MutableList<Player> = mutableListOf()
+) {
+
+    /**
+     * 地主
+     */
+    lateinit var landlord: Player
+
+    /**
+     * 给这个玩家加一张牌
+     */
+    fun addHand(playerIndex: Int, car: Card) {
+        players[playerIndex].addHand(car)
+    }
+
+}
 
 /**
  * 游戏桌
@@ -63,6 +119,21 @@ class DizhuGameTable(
      * 游戏类型默认为 斗地主
      */
     override val gameType: GameType = GameType.DIZHU
+
+    /**
+     * 消息转发玩家列表
+     */
+    private val forwardingPlayers = mutableSetOf<Player>()
+
+    /**
+     * 好友消息订阅映射表 (玩家ID -> 订阅对象)
+     */
+    private val friendSubscriptions = mutableMapOf<Long, Listener<FriendMessageEvent>>()
+
+    /**
+     * 当前玩家消息等待通道
+     */
+    private var currentPlayerChannel: Channel<String>? = null
 
     /**
      * 对局信息
@@ -213,16 +284,15 @@ class DizhuGameTable(
      */
     override suspend fun initial() {
         status = GameStatus.INITIAL
-        var nextPlayer: Player
+        var nextPlayer: Player = randomPlayer()
 
         var landlord: Player? = null
         // 记录每位玩家是否曾经抢过地主
         val qiang = players.associateWith { false }.toMutableMap()
         var round = 1
         var timer = 0
-        val shuffledPlayers  = players.shuffled()
         while (true) {
-            nextPlayer = shuffledPlayers[timer % 3]
+            nextPlayer = nextPlayer(nextPlayer)
             if (round == 1) {
                 //第一轮
                 sendMessage(nextPlayer.id, "开始抢地主:(抢/抢地主)")
@@ -305,7 +375,6 @@ class DizhuGameTable(
         }
 
         game.landlord = landlord
-        game.setNextPlayer(landlord)
         landlord.sendMessage("你的手牌:\n" + " ${landlord.toHand()}")
         if (round == 2) {
             game.fold *= 2
@@ -323,19 +392,27 @@ class DizhuGameTable(
     @Suppress("DuplicatedCode")
     override suspend fun cards() {
         status = GameStatus.BATTLE
-        var player = game.nextPlayer
-
+        var player = game.landlord
         // 比较的玩家
         var maxPlayer: Player? = null
         // 比较的手牌
         var maxCards: List<Card> = mutableListOf()
         // 比较的牌类型
         var maxForm: CardForm = CardForm.ERROR
-        val win: Player
+
+        class WinHolder {
+            var value: Player? = null
+        }
+
+        val winHolder = WinHolder()
+
         // 出牌计数器
         val cardsTimer = mutableMapOf<Player, Int>().apply {
             players.forEach { put(it, 0) }
         }
+
+        //上一个响应指令的玩家
+        var previousPlayer: Player? = null
 
         // 提取出牌后的公共操作
         suspend fun handlePlay(player: Player, cards: List<Card>, match: CardForm, isFirst: Boolean) {
@@ -358,8 +435,7 @@ class DizhuGameTable(
                 if (handSize in 1..3) {
                     msg = msg.plus("\n${player.name} 只剩 $handSize 张牌了!")
                 }
-
-                sendMessage(msg)
+                sendMessageForModel(msg)
                 maxPlayer = player
                 maxForm = match
                 maxCards = cards
@@ -369,79 +445,141 @@ class DizhuGameTable(
             }
         }
 
-        while (true) {
-            val isFirst = maxPlayer == null || maxPlayer == player
-            sendMessage(player, "请出牌!" + if (isFirst) "" else "或者过")
+        /**
+         * 出牌
+         * @param player 玩家
+         * @param content 内容
+         * @return Pair<Boolean,Boolean> 是(true)否获胜,是(true)否出牌
+         */
+        suspend fun handleCardPlay(player: Player, content: String, isFirst: Boolean): Pair<Boolean,Boolean> {
+            val cards = parseCardInput(content).toCard()
+            val forwardingMode = forwardingPlayers.contains(player)
 
-            val content = player.nextMessage(DZConfig.timeOut)?.contentToString() ?: run {
-                abnormalEnd(player)
+            if (cards.isEmpty()) {
+                val msg = "出牌格式错误，请按正确格式出牌！"
+                if (forwardingMode) {
+                    player.sendMessage(msg)
+                } else {
+                    sendMessage(player, msg)
+                }
+                return false to false
+            }
+
+            if (!player.canPlayCards(cards) ) {
+                val msg = "你现在的手牌无法这样出!"
+                if (forwardingMode) {
+                    player.sendMessage(msg)
+                } else {
+                    sendMessage(player, msg)
+                }
+                return false to false
+            }
+
+            val match = CardFormUtil.match(cards.toGroup())
+
+            if (match == CardForm.ERROR) {
+                val msg = "你的出牌不符合规则,请重新出牌!"
+                if (forwardingMode) {
+                    player.sendMessage(msg)
+                } else {
+                    sendMessage(player, msg)
+                }
+                return false to false
+            }
+
+            if (match == CardForm.BOMB || match == CardForm.GHOST_BOMB) {
+                game.fold *= 2
+            }
+
+            // 检查牌型是否有效（如果是跟牌）
+            if (!isFirst && !checkEat(maxForm, match, maxCards, cards)) {
+                val msg = "你要不起!"
+                if (forwardingMode) {
+                    player.sendMessage(msg)
+                } else {
+                    sendMessage(player, msg)
+                }
+                return false to false
+            }
+
+            // 处理出牌后的公共操作
+            handlePlay(player, cards, match, isFirst)
+
+            // 检查是否获胜
+            if (player.hand.isEmpty()) {
+                winHolder.value = player
+                return true to true
+            } else {
+                player.sendMessage(player.toHand())
+                return (false to true)
+            }
+        }
+
+        while (true) {
+            //第一次出牌或者轮到他出牌
+            val isFirst = maxPlayer == null || maxPlayer == player
+
+            // 通知玩家出牌
+            notifyPlayerTurn(player, isFirst,previousPlayer)
+
+            // 获取玩家响应，需要对超时处理！
+            val response = waitForPlayerResponse(player)?:run {
+                abnormalEnd( player)
+                stopGame()
                 return
             }
 
-            // 处理"过"的情况
-            if (!isFirst && content.matches(Regex("\\.{2,4}|go?|过|不要|要不起"))) {
-                player = game.nextPlayer
-                continue
+            // 处理玩家响应
+            when {
+                response == "启用转发" -> {
+                    enableMessageForwarding(player)
+                }
+                response == "禁用转发" -> {
+                    disableMessageForwarding(player)
+                }
+                isSkipResponse(response) -> {
+                    // 只有在不是第一位出牌者时才能过
+                    if (!isFirst) {
+                        val msg = "${player.name} 不要"
+                        sendMessageForModel(msg)
+                        previousPlayer = player
+                        player = nextPlayer(player)
+                        continue
+                    }
+                }
+                isValidCardResponse(response) -> {
+                    // 处理出牌并检查是否获胜
+                    val (isWin,isCard) = handleCardPlay(player, response, isFirst)
+                    if (isWin) break // 如果获胜则跳出循环
+                    if (!isCard) continue
+
+                    // 未获胜则轮到下一位玩家
+                    player = nextPlayer(player)
+                    continue
+                }
+                else -> {}
             }
-
-            // 处理出牌的情况
-            if (content.matches(Regex("^[0-9aAjJqQkK大小王炸]{1,20}$"))) {
-                val listCar = parseCardInput(content)
-                if (listCar.isEmpty()) {
-                    sendMessage(player, "出牌格式错误，请按正确格式出牌！")
-                    continue
-                }
-
-                if (!player.canPlayCards(listCar)) {
-                    sendMessage(player, "你现在的手牌无法这样出!")
-                    continue
-                }
-
-                val cards = listCar.toCard()
-                val match = CardFormUtil.match(cards.toGroup())
-
-                if (match == CardForm.ERROR) {
-                    sendMessage(player, "你的出牌不符合规则,请重新出牌!")
-                    continue
-                }
-
-                if (match == CardForm.BOMB || match == CardForm.GHOST_BOMB) {
-                    game.fold *= 2
-                }
-
-                // 检查牌型是否有效（如果是跟牌）
-                if (!isFirst && !checkEat(maxForm, match, maxCards, cards)) {
-                    sendMessage(player, "你要不起!")
-                    continue
-                }
-
-                // 处理出牌后的公共操作
-                handlePlay(player, cards, match, isFirst)
-
-                // 检查是否获胜
-                if (player.hand.isEmpty()) {
-                    win = player
-                    break
-                } else {
-                    player.sendMessage(player.toHand())
-                }
-
-                // 轮到下一位玩家
-                player = game.nextPlayer
-            } else {
-                sendMessage(player, "出牌格式错误，只能包含[0-9]、A、J、Q、K、大小王等字符！")
-            }
+            previousPlayer = player
+            continue
         }
 
-        if (cardsTimer.filter { it.key != win }.map { it.value }.sum() == 0) {
-            sendMessage("${win.name} 春天!翻4倍!!")
+        val winPlayer = winHolder.value
+
+        if (winPlayer == null) {
+            sendMessage("游戏错误!")
+            stopGame()
+            return
+        }
+
+        if (cardsTimer.filter { it.key != winPlayer }.map { it.value }.sum() == 0) {
+            sendMessage("${winPlayer.name} 春天!翻4倍!!")
             game.fold *= 4
         } else {
-            sendMessage("${win.name} 获胜!")
+            sendMessage("${winPlayer.name} 获胜!")
         }
 
-        if (game.landlord == win) {
-            game.winPlayer.add(win)
+        if (game.landlord == winPlayer) {
+            game.winPlayer.add(winPlayer)
         } else {
             game.winPlayer.addAll(game.players.filter { it != game.landlord })
         }
@@ -541,6 +679,26 @@ class DizhuGameTable(
         stopGame()
     }
 
+    // 通知玩家轮到出牌
+    private suspend fun notifyPlayerTurn(player: Player, isFirst: Boolean ,previousPlayer: Player?) {
+        val prompt = "请出牌!" + if (isFirst) "" else "或者过"
+
+        //只有在第一次轮到该用户且有玩家在群内进行游戏时，才在群内通知
+        if (previousPlayer == null || previousPlayer != player) {
+            if (player in forwardingPlayers) {
+                sendMessage("${player.name} $prompt")
+            } else {
+                sendMessage(player, prompt)
+            }
+        }
+        delay(200)
+        // 如果启用了转发模式，发送好友消息
+        if (player in forwardingPlayers) {
+            player.sendMessage("$prompt \n ${player.toHand()}")
+            delay(50)
+        }
+    }
+
     /**
      * 解析扑克牌输入字符串
      * 支持格式：10、J、Q、K、A、大王、小王等
@@ -600,12 +758,118 @@ class DizhuGameTable(
         }
     }
 
+    /**
+     * 判断是否为跳过出牌
+     */
+    private fun isSkipResponse(content: String) = content.matches(Regex("\\.{2,4}|go?|过|不要|要不起"))
+    /**
+     * 判断是否为有效牌
+     */
+    private fun isValidCardResponse(content: String) = content.matches(Regex("^[0-9aAjJqQkK大小王炸]{1,20}$"))
+
     //==游戏过程辅助私有方法
 
+    /**
+     * 启用消息转发模式
+     */
+    private suspend fun enableMessageForwarding(player: Player) {
+        if (player !in forwardingPlayers) {
+            forwardingPlayers.add(player)
+            sendMessage("${player.name} 已启用消息转发模式")
+            player.sendMessage("已启用消息转发，请通过好友消息出牌")
+        }
+    }
 
-    private suspend fun GameTable.stopGame() {
+    // 禁用消息转发
+    private suspend fun disableMessageForwarding(player: Player) {
+        if (player in forwardingPlayers) {
+            forwardingPlayers.remove(player)
+            sendMessage("${player.name} 已禁用消息转发模式")
+            player.sendMessage("已禁用消息转发，请通过群消息出牌")
+        }
+    }
+
+    // 广播必要消息
+    private suspend fun sendMessageForModel(message: String) {
+        sendMessage(message)
+        delay(200)
+        forwardingPlayers.forEach {
+            it.sendMessage(message)
+            delay(50)
+        }
+    }
+
+    // 等待玩家响应
+    private suspend fun waitForPlayerResponse(player: Player): String? {
+        // 创建响应通道
+        val responseChannel = Channel<String>(1)
+        currentPlayerChannel = responseChannel
+
+        return try {
+            withTimeout(DZConfig.timeOut * 1000L) {
+                if (player in forwardingPlayers) {
+                    // 异步监听好友消息
+                    setupFriendMessageListener(player, responseChannel)
+                    responseChannel.receive()
+                } else {
+                    // 同步等待群消息
+                    player.nextMessage(group, DZConfig.timeOut)?.contentToString()
+                }
+            }
+        } catch (_: TimeoutCancellationException) {
+            abnormalEnd(player)
+            null
+        } finally {
+            // 清理当前监听器
+            currentPlayerChannel = null
+            friendSubscriptions[player.id]?.complete()
+            friendSubscriptions.remove(player.id)
+        }
+    }
+
+    // 设置好友消息监听器
+    private fun setupFriendMessageListener(player: Player, channel: Channel<String>) {
+        // 取消可能存在的旧订阅
+        friendSubscriptions[player.id]?.complete()
+
+        // 创建新订阅
+        val subscription = TeaFoxGames.channel
+            .filter { it.sender.id == player.id }
+            .subscribeAlways<FriendMessageEvent> { event ->
+                val content = event.message.contentToString()
+
+                // 只处理游戏相关指令
+                if (content == "禁用消息转发模式" ||
+                    isSkipResponse(content) ||
+                    isValidCardResponse(content)) {
+
+                    // 在协程上下文中发送响应
+                    CoroutineScope(Dispatchers.Default).launch {
+                        channel.send(content)
+                    }
+                }
+            }
+
+        friendSubscriptions[player.id] = subscription
+    }
+
+    private suspend fun stopGame() {
         players.forEach { group[it.id]?.modifyAdmin(false) }
         group.settings.isMuteAll = false
+        cleanup()
         cancelGame()
     }
+
+    // 清理资源
+    private fun cleanup() {
+        // 取消所有监听
+        friendSubscriptions.values.forEach { it.complete() }
+        friendSubscriptions.clear()
+
+        // 关闭通道
+        currentPlayerChannel?.close()
+        currentPlayerChannel = null
+    }
+
+
 }
