@@ -1,6 +1,6 @@
 package cn.chahuyun.teafox.game.game
 
-import cn.chahuyun.teafox.game.Game
+
 import cn.chahuyun.teafox.game.GameType
 import cn.chahuyun.teafox.game.Player
 import net.mamoe.mirai.contact.Group
