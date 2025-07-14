@@ -8,8 +8,8 @@ import net.mamoe.mirai.contact.Group
 class GandGameTable(
     override val group: Group,
     override val players: List<Player>,
-    override val gameType: GameType
-) : GameTable {
+    override val gameType: GameType = GameType.GAND
+) : CardGameTable(group, players, gameType),GameTable {
 
     /**
      * 游戏对局
@@ -17,13 +17,12 @@ class GandGameTable(
     lateinit var game: Game
 
     /**
-     * ->游戏开始
-     * ->检查好友，开启禁言，发牌
-     * ->进入轮询消息监听，开始对局
+     * 子类实现游戏流程管理
      */
-    override suspend fun start() {
-
+    override suspend fun doStart() {
+        TODO("Not yet implemented")
     }
+
 
     /**
      * ->游戏初期阶段
