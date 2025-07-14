@@ -189,7 +189,7 @@ class GameEvent {
             group.sendMessage("游戏桌 ┳━┳ 已存在，请勿重复创建")
             return
         } else {
-            gameTables[group.id] = DizhuGameTable(group, listOf(), event.bot)
+            gameTables[group.id] = DizhuGameTable(group, listOf() )
         }
         val player = Player(sender.id, sender.nameCardOrNick)
 
@@ -237,7 +237,7 @@ class GameEvent {
             }
         }
 
-        val gameTable = DizhuGameTable(group, players, event.bot, type = type)
+        val gameTable = DizhuGameTable(group, players,  type = type)
         gameTables[group.id] = gameTable
         gameTable.start()
     }
