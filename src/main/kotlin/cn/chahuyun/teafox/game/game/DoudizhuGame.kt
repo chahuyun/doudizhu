@@ -3,7 +3,6 @@ package cn.chahuyun.teafox.game.game
 import cn.chahuyun.teafox.game.*
 import cn.chahuyun.teafox.game.FoxUserManager.addLose
 import cn.chahuyun.teafox.game.FoxUserManager.addVictory
-import cn.chahuyun.teafox.game.TeaFoxGames.debug
 import cn.chahuyun.teafox.game.game.CardFormUtil.check
 import cn.chahuyun.teafox.game.util.CardUtil
 import cn.chahuyun.teafox.game.util.CardUtil.containsRank
@@ -12,15 +11,12 @@ import cn.chahuyun.teafox.game.util.CardUtil.knowCardRank
 import cn.chahuyun.teafox.game.util.CardUtil.show
 import cn.chahuyun.teafox.game.util.CardUtil.toCard
 import cn.chahuyun.teafox.game.util.CardUtil.toGroup
-import cn.chahuyun.teafox.game.util.FriendUtil
 import cn.chahuyun.teafox.game.util.GameTableUtil.sendMessage
 import cn.chahuyun.teafox.game.util.MessageUtil.nextMessage
 import cn.chahuyun.teafox.game.util.MessageUtil.sendMessage
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import net.mamoe.mirai.Bot
 import net.mamoe.mirai.contact.Group
-import net.mamoe.mirai.contact.MemberPermission
 import net.mamoe.mirai.event.Listener
 import net.mamoe.mirai.event.events.FriendMessageEvent
 import net.mamoe.mirai.message.data.At
@@ -91,10 +87,6 @@ class DizhuGameTable(
      */
     override val players: List<Player>,
     /**
-     * bot
-     */
-    private val bot: Bot,
-    /**
      * 游戏状态
      */
     private var status: GameStatus = GameStatus.START,
@@ -106,11 +98,12 @@ class DizhuGameTable(
      * 默认对局类型
      */
     private val type: GameTableCoinsType = GameTableCoinsType.NORMAL,
-) : GameTable {
     /**
      * 游戏类型默认为 斗地主
      */
     override val gameType: GameType = GameType.DIZHU
+) : CardGameTable(group, players, gameType), GameTable {
+
 
     /**
      * 消息转发玩家列表
@@ -137,39 +130,14 @@ class DizhuGameTable(
      */
     private lateinit var bottomCards: List<Card>
 
-    /**
-     * 掀桌异常
-     */
-    private inner class TableFlipException(val player: Player) : RuntimeException()
-    private inner class VotingTimeoutException : RuntimeException()
 
     /**
+     * 子类实现游戏流程管理
      * ->游戏开始
      * ->检查好友，开启禁言，发牌
      * ->进入轮询消息监听，开始对局
      */
-    override suspend fun start() {
-        if (group.botPermission != MemberPermission.OWNER) {
-            sendMessage("本${DZConfig.botName}不是群主哦~")
-            cancelGame()
-            return
-        }
-
-        withTimeoutOrNull(120 * 1000L) {
-            val util = FriendUtil(players)
-            if (util.check()) return@withTimeoutOrNull
-            else sendMessage("游戏开始,请在2分钟内添加本bot的好友!")
-            if (util.listening()) return@withTimeoutOrNull
-        } ?: run {
-            players.forEach {
-                if (bot.getFriend(it.id) == null) {
-                    sendMessage("${it.name} 还不是本${DZConfig.botName}的好友哦!")
-                    cancelGame()
-                    return
-                }
-            }
-        }
-
+    override suspend fun doStart() {
         val votes = ConcurrentHashMap<Long, Int>() // 线程安全的Map
 
         try {
@@ -684,6 +652,8 @@ class DizhuGameTable(
         if (inForwarding) {
             if (previousPlayer == null || previousPlayer != player) {
                 sendMessage("${player.name} $prompt")
+                delay(200)
+                player.sendMessage("$prompt ${player.toHand()}")
             } else {
                 player.sendMessage("$prompt \n ${player.toHand()}")
                 delay(200)
@@ -786,6 +756,7 @@ class DizhuGameTable(
 
     // 检查转发状态时使用ID
     private fun isForwardingEnabled(player: Player) = player in forwardingPlayers
+
     // 广播必要消息
     private suspend fun sendMessageForModel(message: String) {
         sendMessage(message)
@@ -804,7 +775,7 @@ class DizhuGameTable(
 
         return try {
             val b = isForwardingEnabled(player)
-            debug("${player.name} 是否存在 $b")
+//            debug("${player.name} 是否存在 $b")
             withTimeout(DZConfig.timeOut * 1000L) {
                 if (b) {
                     // 异步监听好友消息
