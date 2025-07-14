@@ -108,6 +108,13 @@ interface GameTable {
 }
 
 
+/**
+ * 掀桌异常
+ */
+class TableFlipException(val player: Player) : RuntimeException()
 
-
+/**
+ * 超时异常
+ */
+class VotingTimeoutException : RuntimeException()
 
