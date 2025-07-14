@@ -39,15 +39,7 @@ abstract class CardGameTable(
      */
     protected var gameCancelled = false
 
-    /**
-     * 掀桌异常
-     */
-    protected inner class TableFlipException(val player: Player) : RuntimeException()
 
-    /**
-     * 超时异常
-     */
-    protected inner class VotingTimeoutException : RuntimeException()
 
     /**
      * ->游戏开始
