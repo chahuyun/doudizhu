@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "cn.chahuyun"
-version = "1.0.0"
+version = "1.0.0-dev"
 
 repositories {
     maven("https://nexus.jsdu.cn/repository/maven-public/")
