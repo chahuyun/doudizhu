@@ -3,6 +3,7 @@ package cn.chahuyun.teafox.game.game
 import cn.chahuyun.teafox.game.*
 import cn.chahuyun.teafox.game.FoxUserManager.addLose
 import cn.chahuyun.teafox.game.FoxUserManager.addVictory
+import cn.chahuyun.teafox.game.TeaFoxGames.debug
 import cn.chahuyun.teafox.game.game.CardFormUtil.check
 import cn.chahuyun.teafox.game.util.CardUtil
 import cn.chahuyun.teafox.game.util.CardUtil.containsRank
@@ -15,17 +16,8 @@ import cn.chahuyun.teafox.game.util.FriendUtil
 import cn.chahuyun.teafox.game.util.GameTableUtil.sendMessage
 import cn.chahuyun.teafox.game.util.MessageUtil.nextMessage
 import cn.chahuyun.teafox.game.util.MessageUtil.sendMessage
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.MemberPermission
@@ -68,7 +60,7 @@ data class Game(
     /**
      * 赢家
      */
-    var winPlayer: MutableList<Player> = mutableListOf()
+    var winPlayer: MutableList<Player> = mutableListOf(),
 ) {
 
     /**
@@ -451,9 +443,9 @@ class DizhuGameTable(
          * @param content 内容
          * @return Pair<Boolean,Boolean> 是(true)否获胜,是(true)否出牌
          */
-        suspend fun handleCardPlay(player: Player, content: String, isFirst: Boolean): Pair<Boolean,Boolean> {
+        suspend fun handleCardPlay(player: Player, content: String, isFirst: Boolean): Pair<Boolean, Boolean> {
             val cards = parseCardInput(content).toCard()
-            val forwardingMode = forwardingPlayers.contains(player)
+            val forwardingMode = player in forwardingPlayers
 
             if (cards.isEmpty()) {
                 val msg = "出牌格式错误，请按正确格式出牌！"
@@ -465,7 +457,7 @@ class DizhuGameTable(
                 return false to false
             }
 
-            if (!player.canPlayCards(cards) ) {
+            if (!player.canPlayCards(cards)) {
                 val msg = "你现在的手牌无法这样出!"
                 if (forwardingMode) {
                     player.sendMessage(msg)
@@ -520,11 +512,11 @@ class DizhuGameTable(
             val isFirst = maxPlayer == null || maxPlayer == player
 
             // 通知玩家出牌
-            notifyPlayerTurn(player, isFirst,previousPlayer)
+            notifyPlayerTurn(player, isFirst, previousPlayer)
 
             // 获取玩家响应，需要对超时处理！
-            val response = waitForPlayerResponse(player)?:run {
-                abnormalEnd( player)
+            val response = waitForPlayerResponse(player) ?: run {
+                abnormalEnd(player)
                 stopGame()
                 return
             }
@@ -534,9 +526,11 @@ class DizhuGameTable(
                 response == "启用转发" -> {
                     enableMessageForwarding(player)
                 }
+
                 response == "禁用转发" -> {
                     disableMessageForwarding(player)
                 }
+
                 isSkipResponse(response) -> {
                     // 只有在不是第一位出牌者时才能过
                     if (!isFirst) {
@@ -547,9 +541,10 @@ class DizhuGameTable(
                         continue
                     }
                 }
+
                 isValidCardResponse(response) -> {
                     // 处理出牌并检查是否获胜
-                    val (isWin,isCard) = handleCardPlay(player, response, isFirst)
+                    val (isWin, isCard) = handleCardPlay(player, response, isFirst)
                     if (isWin) break // 如果获胜则跳出循环
                     if (!isCard) continue
 
@@ -557,6 +552,7 @@ class DizhuGameTable(
                     player = nextPlayer(player)
                     continue
                 }
+
                 else -> {}
             }
             previousPlayer = player
@@ -680,22 +676,20 @@ class DizhuGameTable(
     }
 
     // 通知玩家轮到出牌
-    private suspend fun notifyPlayerTurn(player: Player, isFirst: Boolean ,previousPlayer: Player?) {
+    private suspend fun notifyPlayerTurn(player: Player, isFirst: Boolean, previousPlayer: Player?) {
         val prompt = "请出牌!" + if (isFirst) "" else "或者过"
 
         //只有在第一次轮到该用户且有玩家在群内进行游戏时，才在群内通知
-        if (previousPlayer == null || previousPlayer != player) {
-            if (player in forwardingPlayers) {
+        val inForwarding = isForwardingEnabled(player)
+        if (inForwarding) {
+            if (previousPlayer == null || previousPlayer != player) {
                 sendMessage("${player.name} $prompt")
             } else {
-                sendMessage(player, prompt)
+                player.sendMessage("$prompt \n ${player.toHand()}")
+                delay(200)
             }
-        }
-        delay(200)
-        // 如果启用了转发模式，发送好友消息
-        if (player in forwardingPlayers) {
-            player.sendMessage("$prompt \n ${player.toHand()}")
-            delay(50)
+        } else {
+            sendMessage(player, prompt)
         }
     }
 
@@ -738,7 +732,7 @@ class DizhuGameTable(
         maxForm: CardForm,
         nowForm: CardForm,
         maxCards: List<Card>,
-        nowCards: List<Card>
+        nowCards: List<Card>,
     ): Boolean {
         //先判断炸弹
         when (maxForm.value) {
@@ -762,6 +756,7 @@ class DizhuGameTable(
      * 判断是否为跳过出牌
      */
     private fun isSkipResponse(content: String) = content.matches(Regex("\\.{2,4}|go?|过|不要|要不起"))
+
     /**
      * 判断是否为有效牌
      */
@@ -789,6 +784,8 @@ class DizhuGameTable(
         }
     }
 
+    // 检查转发状态时使用ID
+    private fun isForwardingEnabled(player: Player) = player in forwardingPlayers
     // 广播必要消息
     private suspend fun sendMessageForModel(message: String) {
         sendMessage(message)
@@ -806,8 +803,10 @@ class DizhuGameTable(
         currentPlayerChannel = responseChannel
 
         return try {
+            val b = isForwardingEnabled(player)
+            debug("${player.name} 是否存在 $b")
             withTimeout(DZConfig.timeOut * 1000L) {
-                if (player in forwardingPlayers) {
+                if (b) {
                     // 异步监听好友消息
                     setupFriendMessageListener(player, responseChannel)
                     responseChannel.receive()
@@ -841,7 +840,8 @@ class DizhuGameTable(
                 // 只处理游戏相关指令
                 if (content == "禁用消息转发模式" ||
                     isSkipResponse(content) ||
-                    isValidCardResponse(content)) {
+                    isValidCardResponse(content)
+                ) {
 
                     // 在协程上下文中发送响应
                     CoroutineScope(Dispatchers.Default).launch {
