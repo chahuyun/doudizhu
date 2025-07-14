@@ -11,6 +11,7 @@ import cn.chahuyun.teafox.game.util.CardUtil.knowCardRank
 import cn.chahuyun.teafox.game.util.CardUtil.show
 import cn.chahuyun.teafox.game.util.CardUtil.toCard
 import cn.chahuyun.teafox.game.util.CardUtil.toGroup
+import cn.chahuyun.teafox.game.util.GameTableUtil.asyncGetBottomScore
 import cn.chahuyun.teafox.game.util.GameTableUtil.sendMessage
 import cn.chahuyun.teafox.game.util.MessageUtil.nextMessage
 import cn.chahuyun.teafox.game.util.MessageUtil.sendMessage
@@ -19,11 +20,6 @@ import kotlinx.coroutines.channels.Channel
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.event.Listener
 import net.mamoe.mirai.event.events.FriendMessageEvent
-import net.mamoe.mirai.message.data.At
-import net.mamoe.mirai.message.data.buildMessageChain
-import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.floor
-import kotlin.math.roundToInt
 
 /**
  * 对局
@@ -138,69 +134,23 @@ class DizhuGameTable(
      * ->进入轮询消息监听，开始对局
      */
     override suspend fun doStart() {
-        val votes = ConcurrentHashMap<Long, Int>() // 线程安全的Map
+        val result = asyncGetBottomScore(type.min, type.max)
 
-        try {
-            coroutineScope {
-                sendMessage(buildMessageChain {
-                    players.forEach { player ->
-                        +At(player.id)
-                    }
-                    +"请同时投票底分(${type.min}~${type.max})，发送「掀桌」停止配置"
-                })
-
-                // 为每个玩家启动异步任务
-                players.map { player ->
-                    async {
-                        try {
-                            val input = player.nextMessage(group, DZConfig.timeOut)?.contentToString()?.trim()
-                                ?: throw VotingTimeoutException()
-
-                            if (input.startsWith("掀桌")) {
-                                throw TableFlipException(player)
-                            }
-
-                            val bet = input.toIntOrNull()
-                            if (bet != null && bet in type.min..type.max) {
-                                votes[player.id] = bet
-                                sendMessage("${player.name} 配置底分为: $bet!")
-                            } else {
-                                sendMessage("${player.name} 输入无效，底分范围为 ${type.min}~${type.max}，已使用默认值 ${type.min}。")
-                                votes[player.id] = type.min
-                            }
-                        } catch (e: Exception) {
-                            when (e) {
-                                is TableFlipException, is VotingTimeoutException -> throw e
-                                else -> {
-                                    // 其他异常使用默认值
-                                    votes[player.id] = type.min
-                                }
-                            }
-                        }
-                    }
-                }.awaitAll()
+        result.onFailure { e ->
+            when (e) {
+                is TableFlipException -> sendMessage("${e.player.name} 掀桌(╯‵□′)╯︵┻━┻")
+                is VotingTimeoutException -> sendMessage("配置超时,(╯‵□′)╯︵┻━┻")
+                else -> {
+                    sendMessage("配置过程中发生错误，游戏取消")
+                    TeaFoxGames.error(e.message, e)
+                }
             }
-        } catch (e: TableFlipException) {
-            sendMessage("${e.player.name} 掀桌(╯‵□′)╯︵┻━┻")
             cancelGame()
-            return
-        } catch (_: VotingTimeoutException) {
-            sendMessage("配置超时,(╯‵□′)╯︵┻━┻")
-            cancelGame()
-            return
-        } catch (e: Exception) {
-            sendMessage("配置过程中发生错误，游戏取消")
-            cancelGame()
-            TeaFoxGames.error(e.message, e)
             return
         }
 
-        // 计算平均值
-        val total = votes.values.sum()
-        // 平均值
-        val average = total / votes.size.toDouble()
-        // 向下取整
-        val finalBet = floor(average).roundToInt()
+        // 获取成功结果
+        val (finalBet, votes) = result.getOrThrow()
 
         sendMessage("三人输入底分分别为：${votes.values.joinToString(",")}，最终底分为：$finalBet")
 
