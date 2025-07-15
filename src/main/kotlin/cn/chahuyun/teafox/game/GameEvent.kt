@@ -7,6 +7,7 @@ import cn.chahuyun.hibernateplus.HibernateFactory
 import cn.chahuyun.teafox.game.FoxUserManager.getFoxUser
 import cn.chahuyun.teafox.game.TeaFoxGames.debug
 import cn.chahuyun.teafox.game.data.FoxUser
+import cn.chahuyun.teafox.game.game.BaghChalGame
 import cn.chahuyun.teafox.game.game.DizhuGameTable
 import cn.chahuyun.teafox.game.game.GameTable
 import cn.chahuyun.teafox.game.game.GandGameTable
@@ -39,7 +40,48 @@ class GameEvent {
             gameTables.remove(group.id)
         }
     }
+    @MessageAuthorize(text=["开始下棋"])
+    suspend fun startBaghChalGame(event: GroupMessageEvent) {
+        val sender = event.sender
+        val group = event.group
+        if(gameTables.containsKey(group.id)){
+            group.sendMessage("游戏桌 ┳━┳ 已存在，请勿重复创建")
+            return
+        } else {
+            gameTables[group.id] = DizhuGameTable(group, listOf()) // 占位用
+        }
+        val player = Player(sender.id, sender.nameCardOrNick)
+        if (!checkPlayerInGame(player, group)) {
+            group.sendMessage("${player.name} 你已加入其他游戏桌，请勿重复加入")
+        }
+        group.sendMessage("${player.name} 开启了一桌 羊狼棋 对局游戏，快快发送 加入|来 加入对局进行游戏吧!")
+        var ready:Boolean = false
+        val players = mutableListOf(player)
+        while (!ready){
 
+            val messageEvent = nextGroupMessageEvent(group, DZConfig.timeOut) ?: run {
+                group.sendMessage("等待玩家加入超时，游戏未能开始(╯‵□′)╯︵┻━┻")
+                gameTables.remove(group.id)
+                return // 如果超时则退出
+            }
+            val content = messageEvent.message.contentToString()
+            if (content.matches("^加入|来".toRegex())) { // 检查消息内容是否为加入请求
+                val newPlayer = Player(messageEvent.sender.id, messageEvent.sender.nick)
+                // 防止重复加入
+                if (players.any { it.id == newPlayer.id } || !checkPlayerInGame(newPlayer, group)) continue
+                players.add(newPlayer)
+                ready = true
+                group.sendMessage("${newPlayer.name} 加入了游戏！当前玩家：${players.joinToString(",") { it.name }}")
+            } else if (content.matches("^掀桌".toRegex())) {
+                group.sendMessage("掀桌(╯‵□′)╯︵┻━┻")
+                gameTables.remove(group.id)
+                return
+            }
+        }
+        val gameTable = BaghChalGame(group, players, GameType.BaghChalGame)
+        gameTables[group.id] = gameTable
+        gameTable.start()
+    }
 
     @MessageAuthorize(text = ["开桌", "来一局"])
     suspend fun startGameMin(event: GroupMessageEvent) = startDoudizhuGame(event, GameTableCoinsType.NORMAL)

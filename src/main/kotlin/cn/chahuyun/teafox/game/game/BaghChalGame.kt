@@ -1,6 +1,11 @@
 package cn.chahuyun.teafox.game.game
 
+import cn.chahuyun.teafox.game.GameEvent
+import cn.chahuyun.teafox.game.GameType
+import cn.chahuyun.teafox.game.Player
+import cn.chahuyun.teafox.game.game.BaghChalGameCore.MoveDirection.*
 import cn.chahuyun.teafox.game.game.BaghChalGameCore.PosStatue.*
+import net.mamoe.mirai.contact.Group
 
 /**
  * 行数
@@ -62,7 +67,7 @@ class BaghChalGameCore {
 
 
     }
-
+    var winner:PosStatue = Empty
     /** 棋盘 */
     private val vectorMap: Array<Array<PosStatue>> = Array(rowSize) { Array(rowSize) { Empty } }
 
@@ -105,6 +110,7 @@ class BaghChalGameCore {
         term = false
         piecesLeft = 20
         piecesCaptured = 0
+        winner = Empty
     }
 
     /**
@@ -118,7 +124,110 @@ class BaghChalGameCore {
         } else {
             wolfStep(sPos, tPos)
         }
+        // 判断胜负
+        if (!term && piecesCaptured >= 5){
+            // 狼获胜
+            winner = Wolf
+            return
+        }
+        if (term && !hasWay2Go()){
+            // 羊获胜
+            winner = Sheep
+            return
+        }
+
+        // 交换执棋顺序
         term = !term
+    }
+    /**判断狼方没有路可以走*/
+    private fun hasWay2Go():Boolean{
+        // 获取每个狼棋子的坐标
+        val wolfs = arrayListOf<Point>()
+        outer@for ((rowIndex,row) in vectorMap.withIndex()){
+            for ((colIndex,unit) in row.withIndex()){
+                if (unit == Wolf){
+                    wolfs.add(Point(rowIndex, colIndex))
+                }
+                if (wolfs.size>=4){
+                    break@outer
+                }
+            }
+        }
+
+        for (wolf in wolfs){
+            // 判断每个狼棋子是否有路可以走
+            for(p in getPoints(wolf)){
+                if (getPosStatue(p)==Empty){
+                    return true
+                }
+            }
+            // 上下左右
+            if(eatable(wolf,Up) || eatable(wolf,Right) || eatable(wolf,Down) || eatable(wolf,Left)) return true
+            if (wolf.isDiagonal()){
+                if(eatable(wolf, UpRight) || eatable(wolf, UpLeft) || eatable(wolf, DownRight)|| eatable(wolf, DownLeft)){
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    enum class MoveDirection {
+        Up,Right,Down,Left,UpRight,DownRight,UpLeft,DownLeft
+    }
+
+    /**判断狼在某个方向是否能吃子*/
+    private fun eatable(wolf:Point,dir: MoveDirection):Boolean{
+        when(dir){
+            Up -> {
+                val up = wolf.up()
+                val upper = up.up()
+                if (up.outOfBounds()||upper.outOfBounds()) return false
+                return (getPosStatue(up)==Sheep&&getPosStatue(upper)==Empty)
+            }
+            Right -> {
+                val right = wolf.right()
+                val righter = right.right()
+                if (right.outOfBounds()||righter.outOfBounds()) return false
+                return (getPosStatue(right)==Sheep&&getPosStatue(righter)==Empty)
+            }
+            Down -> {
+                val down = wolf.down()
+                val downer = down.down()
+                if (down.outOfBounds()||downer.outOfBounds()) return false
+                return (getPosStatue(down)==Sheep&&getPosStatue(downer)==Empty)
+            }
+            Left -> {
+                val left = wolf.left()
+                val lefter = left.left()
+                if (left.outOfBounds()||lefter.outOfBounds()) return false
+                return (getPosStatue(left)==Sheep&&getPosStatue(lefter)==Empty)
+            }
+            UpRight -> {
+                val upRight = wolf.upRight()
+                val downer = upRight.upRight()
+                if (upRight.outOfBounds()||downer.outOfBounds()) return false
+                return (getPosStatue(upRight)==Sheep&&getPosStatue(downer)==Empty)
+            }
+            DownRight -> {
+                val upRight = wolf.downRight()
+                val downer = upRight.downRight()
+                if (upRight.outOfBounds()||downer.outOfBounds()) return false
+                return (getPosStatue(upRight)==Sheep&&getPosStatue(downer)==Empty)
+            }
+            UpLeft -> {
+                val upRight = wolf.upLeft()
+                val downer = upRight.upLeft()
+                if (upRight.outOfBounds()||downer.outOfBounds()) return false
+                return (getPosStatue(upRight)==Sheep&&getPosStatue(downer)==Empty)
+            }
+            DownLeft -> {
+                val upRight = wolf.downLeft()
+                val downer = upRight.downLeft()
+                if (upRight.outOfBounds()||downer.outOfBounds()) return false
+                return (getPosStatue(upRight)==Sheep&&getPosStatue(downer)==Empty)
+            }
+        }
     }
 
     /**
@@ -130,7 +239,9 @@ class BaghChalGameCore {
         // ---检查移动起点是否为狼棋子
         // ---获取起始棋子所有可移动点位
         // ---对比目标点位是否包含在可移动点位中
-        if (sp.outOfBounds()) throw BaghChalGameCoreException("起始坐标越界")
+        if (sp.outOfBounds()) {
+            throw BaghChalGameCoreException("起始坐标越界")
+        }
         if (tp.outOfBounds()) throw BaghChalGameCoreException("目标坐标越界")
         val source = getPosStatue(sp)
         if (source != Wolf) throw BaghChalGameCoreException("狼方玩家执棋错误")
@@ -183,8 +294,10 @@ class BaghChalGameCore {
         }
     }
 
+    /**删除被吃掉的棋子，因为只有羊棋会被吃，顺便对吃子进行计数*/
     private fun remove(p:Point){
         vectorMap[p.row][p.col] = Empty
+        piecesCaptured += 1
     }
 
     /**
@@ -255,7 +368,7 @@ class BaghChalGameCore {
         val empty = "⛌"
         println(
             """
-            ---------------------
+            --------------------------
             sheep:${sheep} wolf:${wolf} empty:${empty}
             当前${if(term) sheep else wolf}
         """.trimIndent()
@@ -275,5 +388,45 @@ class BaghChalGameCore {
     }
 }
 
-
 class BaghChalGameCoreException(override val message: String?) : Exception(message)
+
+class BaghChalGame(override val group: Group,
+                   override val players: List<Player>,
+                   override val gameType: GameType) :GameTable{
+    /**
+     * ->游戏开始
+     * ->检查好友，开启禁言，发牌
+     * ->进入轮询消息监听，开始对局
+     */
+
+    override suspend fun start() {
+        group.sendMessage("TODO:还没做好，敬请期待\n欸嘿？（歪头）")
+        GameEvent.cancelGame(group)
+    }
+
+    /**
+     * ->游戏初期阶段
+     * ->抢地主阶段
+     * ->决定地主，补牌
+     */
+    override suspend fun initial() {
+        TODO("Not yet implemented")
+    }
+
+    /**
+     * ->游戏对局阶段
+     * ->出牌
+     */
+    override suspend fun cards() {
+        TODO("Not yet implemented")
+    }
+
+    /**
+     * ->对局结束
+     * ->计算倍率，计算积分，操作结果
+     */
+    override suspend fun stop() {
+        TODO("Not yet implemented")
+    }
+
+}
