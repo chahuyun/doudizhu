@@ -26,14 +26,7 @@ class GandGameTable(
         val result = asyncGetBottomScore(100,1000)
 
         result.onFailure { e ->
-            when (e) {
-                is TableFlipException -> sendMessage("${e.player.name} 掀桌(╯‵□′)╯︵┻━┻")
-                is VotingTimeoutException -> sendMessage("配置超时,(╯‵□′)╯︵┻━┻")
-                else -> {
-                    sendMessage("配置过程中发生错误，游戏取消")
-                    TeaFoxGames.error(e.message, e)
-                }
-            }
+            handleGameException(e)
             cancelGame()
             return
         }
