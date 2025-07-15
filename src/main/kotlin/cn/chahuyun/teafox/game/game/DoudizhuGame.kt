@@ -137,14 +137,7 @@ class DizhuGameTable(
         val result = asyncGetBottomScore(type.min, type.max)
 
         result.onFailure { e ->
-            when (e) {
-                is TableFlipException -> sendMessage("${e.player.name} 掀桌(╯‵□′)╯︵┻━┻")
-                is VotingTimeoutException -> sendMessage("配置超时,(╯‵□′)╯︵┻━┻")
-                else -> {
-                    sendMessage("配置过程中发生错误，游戏取消")
-                    TeaFoxGames.error(e.message, e)
-                }
-            }
+            handleGameException(e)
             cancelGame()
             return
         }
@@ -489,7 +482,8 @@ class DizhuGameTable(
             sendMessage("${winPlayer.name} 春天!翻4倍!!")
             game.fold *= 4
         } else {
-            sendMessage("${winPlayer.name} 获胜!")
+            val msg = "${winPlayer.name} 获胜!"
+            sendMessageForModel(msg)
         }
 
         if (game.landlord == winPlayer) {
