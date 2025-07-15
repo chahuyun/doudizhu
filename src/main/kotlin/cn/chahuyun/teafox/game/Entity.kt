@@ -229,4 +229,8 @@ enum class GameType {
      * 干瞪眼
      */
     GAND,
+    /**
+     * 羊狼棋
+     * */
+    BaghChalGame,
 }
