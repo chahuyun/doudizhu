@@ -196,8 +196,6 @@ enum class CardRank(val value: Int, val display: String, val sort: Int) {
     TWO(15, "2", 13),
     SMALL_JOKER(16, "小王", 14),
     BIG_JOKER(17, "大王", 15)
-
-
 }
 
 /**
